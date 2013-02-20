@@ -5,6 +5,6 @@
 package api
 
 type (
-	SQLLEN int64
+	SQLLEN  int64
 	SQLULEN uint64
 )

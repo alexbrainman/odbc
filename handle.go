@@ -33,6 +33,9 @@ func ToHandleAndType(handle interface{}) (h api.SQLHANDLE, ht api.SQLSMALLINT) {
 func releaseHandle(handle interface{}) error {
 	h, ht := ToHandleAndType(handle)
 	ret := api.SQLFreeHandle(ht, h)
+	if ret == api.SQL_INVALID_HANDLE {
+		return fmt.Errorf("SQLFreeHandle(%d, %d) returns SQL_INVALID_HANDLE", ht, h)
+	}
 	if IsError(ret) {
 		return NewError("SQLFreeHandle", h)
 	}
