@@ -78,6 +78,7 @@ while(<>) {
 
 	# Prepare arguments.
 	my @sqlin= ();
+	my @pin= ();
 	foreach my $p (@in) {
 		my ($name, $type) = parseparam($p);
 
@@ -90,9 +91,13 @@ while(<>) {
 		} else {
 			push @sqlin, sprintf "C.%s(%s)", $type, $name;
 		}
+		push @pin, sprintf "\"%s=\", %s, ", $name, $name;
 	}
 
 	$text .= sprintf "\tr := C.%s(%s)\n", $sysname, join(',', @sqlin);
+	if(0) {
+		$text .= sprintf "println(\"SYSCALL: %s(\", %s\") (\", r, \")\")\n", $func, join('", ", ', @pin);
+	}
 	$text .= "\treturn SQLRETURN(r)\n";
 	$text .= "}\n";
 }
