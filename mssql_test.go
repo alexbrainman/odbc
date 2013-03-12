@@ -145,7 +145,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 	// create table
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (name varchar(20), age int, isGirl bit, weight decimal(5,2), dob datetime, data varbinary(10), canBeNull varchar(10))")
-	{
+	func() {
 		s, err := db.Prepare("insert into dbo.temp (name, age, isGirl, weight, dob, data, canBeNull) values (?, ?, ?, ?, ?, cast(? as varbinary(10)), ?)")
 		if err != nil {
 			t.Fatal(err)
@@ -165,7 +165,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
+	}()
 
 	// read from the table and verify returned results
 	rows, err := db.Query("select name, age, isGirl, weight, dob, data, canBeNull from dbo.temp")
@@ -595,7 +595,7 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (dept char(3), name varchar(20))")
 
-	{
+	func() {
 		// test 1 Stmt and many Exec's
 		s, err := db.Prepare("insert into dbo.temp (dept, name) values (?, ?)")
 		if err != nil {
@@ -610,9 +610,9 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 				}
 			}
 		}
-	}
+	}()
 
-	{
+	func() {
 		// test Stmt is closed before Rows are
 		s, err := db.Prepare("select name from dbo.temp")
 		if err != nil {
@@ -650,9 +650,9 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		if n != should {
 			t.Fatalf("expected %v, but received %v", should, n)
 		}
-	}
+	}()
 
-	{
+	func() {
 		// test 1 Stmt and many Query's executed one after the other
 		s, err := db.Prepare("select name from dbo.temp where dept = ? order by name")
 		if err != nil {
@@ -735,7 +735,7 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 				}
 			}
 		}
-	}
+	}()
 
 	exec(t, db, "drop table dbo.temp")
 }
