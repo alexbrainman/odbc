@@ -584,7 +584,14 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc+2)
+	defer func() {
+		// not checking resources usage here, because these are
+		// unpredictable due to use of goroutines.
+		err := db.Close()
+		if err != nil {
+			t.Fatalf("error closing DB: %v", err)
+		}
+	}()
 
 	var staff = map[string][]string{
 		"acc": {"John", "Mary", "Moe"},
@@ -652,6 +659,12 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		}
 	}()
 
+	if db.Driver().(*odbc.Driver).Stats.StmtCount != sc {
+		t.Fatalf("invalid statement count: expected %v, is %v", sc, db.Driver().(*odbc.Driver).Stats.StmtCount)
+	}
+
+	// no reource tracking past this point
+
 	func() {
 		// test 1 Stmt and many Query's executed one after the other
 		s, err := db.Prepare("select name from dbo.temp where dept = ? order by name")
@@ -691,7 +704,8 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 			c := make(chan error)
 			go func(c chan error, dept string, people []string) {
 				c <- nil
-				// TODO(brainman): talk to brad about why this runs diver.Conn.Prepare again and again
+				// NOTE(brainman): this could actually re-prepare since
+				// we are running it simultaneously in multiple goroutines
 				r, err := s.Query(dept)
 				if err != nil {
 					c <- fmt.Errorf("%v", err)
