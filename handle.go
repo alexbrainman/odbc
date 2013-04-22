@@ -37,7 +37,7 @@ func releaseHandle(handle interface{}) error {
 		return fmt.Errorf("SQLFreeHandle(%d, %d) returns SQL_INVALID_HANDLE", ht, h)
 	}
 	if IsError(ret) {
-		return NewError("SQLFreeHandle", h)
+		return NewError("SQLFreeHandle", handle)
 	}
 	drv.Stats.updateHandleCount(ht, -1)
 	return nil
