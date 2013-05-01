@@ -37,7 +37,7 @@ type Column interface {
 	Value(h api.SQLHSTMT, idx int) (driver.Value, error)
 }
 
-// TODO(brainman): did not check for MS SQL timestamp and xml columns
+// TODO(brainman): did not check for MS SQL timestamp
 
 func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	namebuf := make([]uint16, 100)
@@ -79,7 +79,7 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	case api.SQL_LONGVARCHAR:
 		b.CType = api.SQL_C_CHAR
 		return &NonBindableColumn{b}, nil
-	case api.SQL_WLONGVARCHAR:
+	case api.SQL_WLONGVARCHAR, api.SQL_SS_XML:
 		b.CType = api.SQL_C_WCHAR
 		return &NonBindableColumn{b}, nil
 	case api.SQL_LONGVARBINARY:

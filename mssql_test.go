@@ -16,22 +16,23 @@ import (
 )
 
 var (
-	mssrv  = flag.String("mssrv", "server", "ms sql server name")
-	msdb   = flag.String("msdb", "dbname", "ms sql server database name")
-	msuser = flag.String("msuser", "", "ms sql server user name")
-	mspass = flag.String("mspass", "", "ms sql server password")
+	mssrv    = flag.String("mssrv", "server", "ms sql server name")
+	msdb     = flag.String("msdb", "dbname", "ms sql server database name")
+	msuser   = flag.String("msuser", "", "ms sql server user name")
+	mspass   = flag.String("mspass", "", "ms sql server password")
+	msdriver = flag.String("msdriver", "sql server", "ms sql odbc driver name")
 )
 
 func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 	var params map[string]string
 	if runtime.GOOS == "windows" {
 		params = map[string]string{
-			"driver":   "sql server",
+			"driver":   *msdriver,
 			"server":   *mssrv,
 			"database": *msdb,
 		}
 		if len(*msuser) == 0 {
-			params["trusted_connection"] = "true"
+			params["trusted_connection"] = "yes"
 		} else {
 			params["uid"] = *msuser
 			params["pwd"] = *mspass
@@ -473,12 +474,14 @@ var typeTests = []typeTest{
 	{"select cast(NULL as varbinary(max))", match(nil)},
 }
 
-// TODO(brainman): see why typeUnicodeTests do not work on linux
+// TODO(brainman): see why typeWindowsSpecificTests do not work on linux
 
-var typeUnicodeTests = []typeTest{
+var typeWindowsSpecificTests = []typeTest{
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match("\u0421\u0430\u0448\u0430")},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match("\u0421\u0430\u0448\u0430")},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match("\u0421\u0430\u0448\u0430")},
+	{"select cast(N'<root>hello</root>' as xml)", match("<root>hello</root>")},
+	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match("<root><doc><item1>dd</item1></doc></root>")},
 }
 
 var typeTestsToFail = []string{
@@ -506,7 +509,7 @@ func TestMSSQLTypes(t *testing.T) {
 
 	tests := typeTests
 	if runtime.GOOS == "windows" {
-		tests = append(tests, typeUnicodeTests...)
+		tests = append(tests, typeWindowsSpecificTests...)
 	}
 	for _, r := range tests {
 		rows, err := db.Query(r.query)

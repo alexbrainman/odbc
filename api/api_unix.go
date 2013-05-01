@@ -71,6 +71,9 @@ const (
 	SQL_SIGNED_OFFSET   = C.SQL_SIGNED_OFFSET
 	SQL_UNSIGNED_OFFSET = C.SQL_UNSIGNED_OFFSET
 
+	// TODO(lukemauldin): Not defined in sqlext.h. Using windows value, but it is not supported.
+	SQL_SS_XML = -152
+
 	SQL_C_CHAR           = C.SQL_C_CHAR
 	SQL_C_LONG           = C.SQL_C_LONG
 	SQL_C_SHORT          = C.SQL_C_SHORT
