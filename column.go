@@ -71,20 +71,17 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 		var v api.SQLGUID
 		return NewBindableColumn(b, api.SQL_C_GUID, int(unsafe.Sizeof(v))), nil
 	case api.SQL_CHAR, api.SQL_VARCHAR:
-		return NewVariableWidthBindableColumn(b, api.SQL_C_CHAR, size), nil
+		return NewVariableWidthColumn(b, api.SQL_C_CHAR, size), nil
 	case api.SQL_WCHAR, api.SQL_WVARCHAR:
-		return NewVariableWidthBindableColumn(b, api.SQL_C_WCHAR, size), nil
+		return NewVariableWidthColumn(b, api.SQL_C_WCHAR, size), nil
 	case api.SQL_BINARY, api.SQL_VARBINARY:
-		return NewVariableWidthBindableColumn(b, api.SQL_C_BINARY, size), nil
+		return NewVariableWidthColumn(b, api.SQL_C_BINARY, size), nil
 	case api.SQL_LONGVARCHAR:
-		b.CType = api.SQL_C_CHAR
-		return &NonBindableColumn{b}, nil
+		return NewVariableWidthColumn(b, api.SQL_C_CHAR, 0), nil
 	case api.SQL_WLONGVARCHAR, api.SQL_SS_XML:
-		b.CType = api.SQL_C_WCHAR
-		return &NonBindableColumn{b}, nil
+		return NewVariableWidthColumn(b, api.SQL_C_WCHAR, 0), nil
 	case api.SQL_LONGVARBINARY:
-		b.CType = api.SQL_C_BINARY
-		return &NonBindableColumn{b}, nil
+		return NewVariableWidthColumn(b, api.SQL_C_BINARY, 0), nil
 	default:
 		return nil, fmt.Errorf("unsupported column type %d", sqltype)
 	}
@@ -173,7 +170,11 @@ func NewBindableColumn(b *BaseColumn, ctype api.SQLSMALLINT, bufSize int) *Binda
 	return c
 }
 
-func NewVariableWidthBindableColumn(b *BaseColumn, ctype api.SQLSMALLINT, colWidth api.SQLULEN) *BindableColumn {
+func NewVariableWidthColumn(b *BaseColumn, ctype api.SQLSMALLINT, colWidth api.SQLULEN) Column {
+	if colWidth == 0 {
+		b.CType = ctype
+		return &NonBindableColumn{b}
+	}
 	l := int(colWidth)
 	switch ctype {
 	case api.SQL_C_WCHAR:
