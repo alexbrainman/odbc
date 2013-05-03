@@ -438,6 +438,7 @@ var typeTests = []typeTest{
 	{"select cast(123 as varchar(21))", match("123")},
 	{"select cast(123 as char(5))", match("123  ")},
 	{"select cast('abcde' as varchar(3))", match("abc")},
+	{"select cast('' as varchar(5))", match("")},
 	{"select cast(NULL as varchar(5))", match(nil)},
 
 	// datetime, smalldatetime

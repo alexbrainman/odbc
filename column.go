@@ -99,7 +99,10 @@ func (c *BaseColumn) Name() string {
 }
 
 func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
-	p := unsafe.Pointer(&buf[0])
+	var p unsafe.Pointer
+	if len(buf) > 0 {
+		p = unsafe.Pointer(&buf[0])
+	}
 	switch c.CType {
 	case api.SQL_C_BIT:
 		return buf[0] != 0, nil
