@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package odbc_test
+package odbc
 
 import (
-	"code.google.com/p/odbc"
 	"database/sql"
 	"flag"
 	"fmt"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,11 +57,11 @@ func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	return db, db.Driver().(*odbc.Driver).Stats.StmtCount, nil
+	return db, db.Driver().(*Driver).Stats.StmtCount, nil
 }
 
 func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
-	s := db.Driver().(*odbc.Driver).Stats
+	s := db.Driver().(*Driver).Stats
 	err := db.Close()
 	if err != nil {
 		t.Fatalf("error closing DB: %v", err)
@@ -663,8 +663,8 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		}
 	}()
 
-	if db.Driver().(*odbc.Driver).Stats.StmtCount != sc {
-		t.Fatalf("invalid statement count: expected %v, is %v", sc, db.Driver().(*odbc.Driver).Stats.StmtCount)
+	if db.Driver().(*Driver).Stats.StmtCount != sc {
+		t.Fatalf("invalid statement count: expected %v, is %v", sc, db.Driver().(*Driver).Stats.StmtCount)
 	}
 
 	// no reource tracking past this point
@@ -754,6 +754,78 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 			}
 		}
 	}()
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+func TestMSSQLIssue5(t *testing.T) {
+	testingIssue5 = true
+	defer func() {
+		testingIssue5 = false
+	}()
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `
+		create table dbo.temp (
+			id int,
+			value int,
+			constraint [pk_id] primary key ([id])
+		)
+	`)
+
+	var count int32
+
+	runCycle := func(waitch <-chan struct{}, errch chan<- error) (reterr error) {
+		defer func() {
+			errch <- reterr
+		}()
+		stmt, err := db.Prepare("insert into dbo.temp (id, value) values (?, ?)")
+		if err != nil {
+			return fmt.Errorf("Prepare failed: %v", err)
+		}
+		defer stmt.Close()
+		errch <- nil
+		<-waitch
+		for {
+			i := (int)(atomic.AddInt32(&count, 1))
+			_, err := stmt.Exec(i, i)
+			if err != nil {
+				return fmt.Errorf("Exec failed i=%d: %v", i, err)
+			}
+			runtime.GC()
+			if i >= 100 {
+				break
+			}
+		}
+		return
+	}
+
+	const nworkers = 8
+	waitch := make(chan struct{})
+	errch := make(chan error, nworkers)
+	for i := 0; i < nworkers; i++ {
+		go runCycle(waitch, errch)
+	}
+	for i := 0; i < nworkers; i++ {
+		if err := <-errch; err != nil {
+			t.Error(err)
+		}
+	}
+	if t.Failed() {
+		return
+	}
+	close(waitch)
+	for i := 0; i < nworkers; i++ {
+		if err := <-errch; err != nil {
+			t.Fatal(err)
+		}
+	}
+	// TODO: maybe I should verify dbo.temp records here
 
 	exec(t, db, "drop table dbo.temp")
 }

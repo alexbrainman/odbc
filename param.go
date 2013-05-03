@@ -30,7 +30,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 	case nil:
 		var b byte
 		ctype = api.SQL_C_BIT
-		p.Data = b
+		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		plen = api.SQL_NULL_DATA
 		sqltype = api.SQL_BIT
@@ -38,7 +38,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 	case string:
 		ctype = api.SQL_C_WCHAR
 		b := api.StringToUTF16(d)
-		p.Data = b
+		p.Data = &b[0]
 		buf = unsafe.Pointer(&b[0])
 		l := len(b)
 		l -= 1 // remove terminating 0
@@ -49,7 +49,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		sqltype = api.SQL_WCHAR
 	case int64:
 		ctype = api.SQL_C_SBIGINT
-		p.Data = d
+		p.Data = &d
 		buf = unsafe.Pointer(&d)
 		sqltype = api.SQL_BIGINT
 	case bool:
@@ -58,12 +58,12 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 			b = 1
 		}
 		ctype = api.SQL_C_BIT
-		p.Data = b
+		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		sqltype = api.SQL_BIT
 	case float64:
 		ctype = api.SQL_C_DOUBLE
-		p.Data = d
+		p.Data = &d
 		buf = unsafe.Pointer(&d)
 		sqltype = api.SQL_DOUBLE
 	case time.Time:
@@ -78,7 +78,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 			Second:   api.SQLUSMALLINT(d.Second()),
 			Fraction: api.SQLUINTEGER(d.Nanosecond()),
 		}
-		p.Data = b
+		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		sqltype = api.SQL_TYPE_TIMESTAMP
 		size = 23 // 20 + s (the number of characters in the yyyy-mm-dd hh:mm:ss[.fff...] format, where s is the seconds precision).
@@ -86,7 +86,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		ctype = api.SQL_C_BINARY
 		b := make([]byte, len(d))
 		copy(b, d)
-		p.Data = b
+		p.Data = &b[0]
 		buf = unsafe.Pointer(&b[0])
 		buflen = api.SQLLEN(len(b))
 		plen = buflen

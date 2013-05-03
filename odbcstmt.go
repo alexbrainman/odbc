@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -89,6 +90,8 @@ func (s *ODBCStmt) releaseHandle() error {
 	return releaseHandle(h)
 }
 
+var testingIssue5 bool // used during tests
+
 func (s *ODBCStmt) Exec(args []driver.Value) error {
 	if len(args) != len(s.Parameters) {
 		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.Parameters))
@@ -100,6 +103,9 @@ func (s *ODBCStmt) Exec(args []driver.Value) error {
 		// but rebinding parameters for every new parameter value
 		// should be efficient enough for our purpose.
 		s.Parameters[i].BindValue(s.h, i, a)
+	}
+	if testingIssue5 {
+		time.Sleep(10 * time.Microsecond)
 	}
 	ret := api.SQLExecute(s.h)
 	if IsError(ret) {
