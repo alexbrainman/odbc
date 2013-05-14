@@ -92,6 +92,16 @@ const (
 	SQL_AUTOCOMMIT_DEFAULT = SQL_AUTOCOMMIT_ON
 
 	SQL_IS_UINTEGER = -5
+
+	//Connection pooling
+	SQL_ATTR_CONNECTION_POOLING = 201
+	SQL_ATTR_CP_MATCH           = 202
+	SQL_CP_OFF                  = 0
+	SQL_CP_ONE_PER_DRIVER       = 1
+	SQL_CP_ONE_PER_HENV         = 2
+	SQL_CP_DEFAULT              = SQL_CP_OFF
+	SQL_CP_STRICT_MATCH         = 0
+	SQL_CP_RELAXED_MATCH        = 1
 )
 
 type (
