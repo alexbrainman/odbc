@@ -115,6 +115,9 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 	case api.SQL_C_CHAR:
 		return string(buf), nil
 	case api.SQL_C_WCHAR:
+		if p == nil {
+			return "", nil
+		}
 		s := (*[1 << 20]uint16)(p)[:len(buf)/2]
 		return api.UTF16ToString(s), nil
 	case api.SQL_C_TYPE_TIMESTAMP:

@@ -440,6 +440,10 @@ var typeTests = []typeTest{
 	{"select cast('abcde' as varchar(3))", match("abc")},
 	{"select cast('' as varchar(5))", match("")},
 	{"select cast(NULL as varchar(5))", match(nil)},
+	{"select cast(123 as nvarchar(21))", match("123")},
+	{"select cast('abcde' as nvarchar(3))", match("abc")},
+	{"select cast('' as nvarchar(5))", match("")},
+	{"select cast(NULL as nvarchar(5))", match(nil)},
 
 	// datetime, smalldatetime
 	{"select cast('20151225' as datetime)", match(time.Date(2015, 12, 25, 0, 0, 0, 0, time.Local))},
