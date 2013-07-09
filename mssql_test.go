@@ -833,3 +833,32 @@ func TestMSSQLIssue5(t *testing.T) {
 
 	exec(t, db, "drop table dbo.temp")
 }
+
+func TestMSSQLDeleteNonExistent(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, "create table dbo.temp (name varchar(20))")
+	_, err = db.Exec("insert into dbo.temp (name) values ('alex')")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := db.Exec("delete from dbo.temp where name = 'bob'")
+	if err != nil {
+		t.Fatalf("Exec failed: %v", err)
+	}
+	cnt, err := r.RowsAffected()
+	if err != nil {
+		t.Fatalf("RowsAffected failed: %v", err)
+	}
+	if cnt != 0 {
+		t.Fatalf("RowsAffected returns %d, but 0 expected", cnt)
+	}
+
+	exec(t, db, "drop table dbo.temp")
+}

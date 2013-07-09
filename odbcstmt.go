@@ -108,6 +108,10 @@ func (s *ODBCStmt) Exec(args []driver.Value) error {
 		time.Sleep(10 * time.Microsecond)
 	}
 	ret := api.SQLExecute(s.h)
+	if ret == api.SQL_NO_DATA {
+		// success but no data to report
+		return nil
+	}
 	if IsError(ret) {
 		return NewError("SQLExecute", s.h)
 	}
