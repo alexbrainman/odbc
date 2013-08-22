@@ -145,7 +145,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 
 	// create table
 	db.Exec("drop table dbo.temp")
-	exec(t, db, "create table dbo.temp (name varchar(20), age int, isGirl bit, weight decimal(5,2), dob datetime, data varbinary(10), canBeNull varchar(10))")
+	exec(t, db, "create table dbo.temp (name varchar(20), age int, isGirl bit, weight decimal(5,2), dob datetime, data varbinary(10) null, canBeNull varchar(10) null)")
 	func() {
 		s, err := db.Prepare("insert into dbo.temp (name, age, isGirl, weight, dob, data, canBeNull) values (?, ?, ?, ?, ?, cast(? as varbinary(10)), ?)")
 		if err != nil {
