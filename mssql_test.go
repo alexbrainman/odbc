@@ -20,8 +20,17 @@ var (
 	msdb     = flag.String("msdb", "dbname", "ms sql server database name")
 	msuser   = flag.String("msuser", "", "ms sql server user name")
 	mspass   = flag.String("mspass", "", "ms sql server password")
-	msdriver = flag.String("msdriver", "sql server", "ms sql odbc driver name")
+	msdriver = flag.String("msdriver", defaultDriver(), "ms sql odbc driver name")
+	msport   = flag.String("msport", "1433", "ms sql server port number")
 )
+
+func defaultDriver() string {
+	if runtime.GOOS == "windows" {
+		return "sql server"
+	} else {
+		return "freetds"
+	}
+}
 
 func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 	var params map[string]string
@@ -39,9 +48,9 @@ func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 		}
 	} else {
 		params = map[string]string{
-			"driver":   "freetds",
+			"driver":   *msdriver,
 			"server":   *mssrv,
-			"port":     "1433",
+			"port":     *msport,
 			"database": *msdb,
 			"uid":      *msuser,
 			"pwd":      *mspass,
