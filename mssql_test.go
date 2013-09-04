@@ -6,9 +6,11 @@ package odbc
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -83,6 +85,88 @@ func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
 	default:
 		t.Errorf("unexpected StmtCount: should=%v, is=%v", ignoreIfStmtCount, s.StmtCount)
 	}
+}
+
+// as per http://www.mssqltips.com/sqlservertip/2198/determine-which-version-of-sql-server-data-access-driver-is-used-by-an-application/
+func connProtoVersion(db *sql.DB) ([]byte, error) {
+	var p []byte
+	if err := db.QueryRow("select cast(protocol_version as binary(4)) from master.sys.dm_exec_connections where session_id = @@spid").Scan(&p); err != nil {
+		return nil, err
+	}
+	if len(p) != 4 {
+		return nil, errors.New("failed to fetch connection protocol")
+	}
+	return p, nil
+}
+
+// as per http://msdn.microsoft.com/en-us/library/dd339982.aspx
+func isProto2008OrLater(db *sql.DB) (bool, error) {
+	p, err := connProtoVersion(db)
+	if err != nil {
+		return false, err
+	}
+	return p[0] >= 0x73, nil
+}
+
+// as per http://www.mssqltips.com/sqlservertip/2563/understanding-the-sql-server-select-version-command/
+func serverVersion(db *sql.DB) (sqlVersion, sqlPartNumber, osVersion string, err error) {
+	var v string
+	if err = db.QueryRow("select @@version").Scan(&v); err != nil {
+		return "", "", "", err
+	}
+	a := strings.SplitN(v, "\n", -1)
+	if len(a) < 4 {
+		return "", "", "", errors.New("SQL Server version string must have at least 4 lines: " + v)
+	}
+	for i := range a {
+		a[i] = strings.Trim(a[i], " \t")
+	}
+	l1 := strings.SplitN(a[0], "-", -1)
+	if len(l1) != 2 {
+		return "", "", "", errors.New("SQL Server version first line must have - in it: " + v)
+	}
+	i := strings.Index(a[3], " on ")
+	if i < 0 {
+		return "", "", "", errors.New("SQL Server version fourth line must have 'on' in it: " + v)
+	}
+	sqlVersion = l1[0] + a[3][:i]
+	osVersion = a[3][i+4:]
+	sqlPartNumber = strings.Trim(l1[1], " ")
+	l12 := strings.SplitN(sqlPartNumber, " ", -1)
+	if len(l12) != 2 {
+		return "", "", "", errors.New("SQL Server version first line must have space after part number in it: " + v)
+	}
+	sqlPartNumber = l12[0]
+	return sqlVersion, sqlPartNumber, osVersion, nil
+}
+
+// as per http://www.mssqltips.com/sqlservertip/2563/understanding-the-sql-server-select-version-command/
+func isSrv2008OrLater(db *sql.DB) (bool, error) {
+	_, sqlPartNumber, _, err := serverVersion(db)
+	if err != nil {
+		return false, err
+	}
+	a := strings.SplitN(sqlPartNumber, ".", -1)
+	if len(a) != 4 {
+		return false, errors.New("SQL Server part number must have 4 numbers in it: " + sqlPartNumber)
+	}
+	n, err := strconv.ParseInt(a[0], 10, 0)
+	if err != nil {
+		return false, errors.New("SQL Server invalid part number: " + sqlPartNumber)
+	}
+	return n >= 10, nil
+}
+
+func is2008OrLater(db *sql.DB) bool {
+	b, err := isSrv2008OrLater(db)
+	if err != nil || !b {
+		return false
+	}
+	b, err = isProto2008OrLater(db)
+	if err != nil || !b {
+		return false
+	}
+	return true
 }
 
 func equal(a, b []byte) bool {
@@ -498,6 +582,13 @@ var typeWindowsSpecificTests = []typeTest{
 	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match("<root><doc><item1>dd</item1></doc></root>")},
 }
 
+var typeMSSQL2008Tests = []typeTest{
+	// datetime2
+	{"select cast('20151225' as datetime2)", match(time.Date(2015, 12, 25, 0, 0, 0, 0, time.Local))},
+	{"select cast('2007-05-08 12:35:29.1234567' as datetime2)", match(time.Date(2007, 5, 8, 12, 35, 29, 1234567e2, time.Local))},
+	{"select cast(NULL as datetime2)", match(nil)},
+}
+
 var typeTestsToFail = []string{
 	// int
 	"select cast(-1 as tinyint)",
@@ -524,6 +615,9 @@ func TestMSSQLTypes(t *testing.T) {
 	tests := typeTests
 	if runtime.GOOS == "windows" {
 		tests = append(tests, typeWindowsSpecificTests...)
+	}
+	if is2008OrLater(db) {
+		tests = append(tests, typeMSSQL2008Tests...)
 	}
 	for _, r := range tests {
 		rows, err := db.Query(r.query)
