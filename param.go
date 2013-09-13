@@ -17,41 +17,65 @@ type Parameter struct {
 	SQLType     api.SQLSMALLINT
 	Decimal     api.SQLSMALLINT
 	Size        api.SQLULEN
-	Data        interface{} // to keep data away from gc
 	isDescribed bool
+	// Following fields store data used later by SQLExecute.
+	// The fields keep data alive and away from gc.
+	Data             interface{}
+	StrLen_or_IndPtr api.SQLLEN
+}
+
+// StoreStrLen_or_IndPtr stores v into StrLen_or_IndPtr field of p
+// and returns address of that field.
+func (p *Parameter) StoreStrLen_or_IndPtr(v api.SQLLEN) *api.SQLLEN {
+	p.StrLen_or_IndPtr = v
+	return &p.StrLen_or_IndPtr
+
 }
 
 func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
+	// TODO(brainman): Reuse memory for previously bound values. If memory
+	// is reused, we, probably, do not need to call SQLBindParameter either.
 	var ctype, sqltype, decimal api.SQLSMALLINT
 	var size api.SQLULEN
-	var buflen, plen api.SQLLEN
+	var buflen api.SQLLEN
+	var plen *api.SQLLEN
 	var buf unsafe.Pointer
 	switch d := v.(type) {
 	case nil:
-		var b byte
-		ctype = api.SQL_C_BIT
-		p.Data = &b
-		buf = unsafe.Pointer(&b)
-		plen = api.SQL_NULL_DATA
-		sqltype = api.SQL_BIT
+		ctype = api.SQL_C_WCHAR
+		p.Data = nil
+		buf = nil
 		size = 1
+		buflen = 0
+		plen = p.StoreStrLen_or_IndPtr(api.SQL_NULL_DATA)
+		sqltype = api.SQL_WCHAR
 	case string:
 		ctype = api.SQL_C_WCHAR
 		b := api.StringToUTF16(d)
-		p.Data = &b[0]
+		p.Data = b
 		buf = unsafe.Pointer(&b[0])
 		l := len(b)
 		l -= 1 // remove terminating 0
 		size = api.SQLULEN(l)
+		if size < 1 {
+			// size cannot be less then 1 even for empty fields
+			size = 1
+		}
 		l *= 2 // every char takes 2 bytes
 		buflen = api.SQLLEN(l)
-		plen = buflen
-		sqltype = api.SQL_WCHAR
+		plen = p.StoreStrLen_or_IndPtr(buflen)
+		if p.isDescribed {
+			// only so we can handle very long (>4000 chars) parameters
+			sqltype = p.SQLType
+		} else {
+			sqltype = api.SQL_WCHAR
+		}
 	case int64:
 		ctype = api.SQL_C_SBIGINT
 		p.Data = &d
 		buf = unsafe.Pointer(&d)
 		sqltype = api.SQL_BIGINT
+		size = 8
 	case bool:
 		var b byte
 		if d {
@@ -61,11 +85,13 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		sqltype = api.SQL_BIT
+		size = 1
 	case float64:
 		ctype = api.SQL_C_DOUBLE
 		p.Data = &d
 		buf = unsafe.Pointer(&d)
 		sqltype = api.SQL_DOUBLE
+		size = 8
 	case time.Time:
 		ctype = api.SQL_C_TYPE_TIMESTAMP
 		y, m, day := d.Date()
@@ -81,28 +107,25 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		sqltype = api.SQL_TYPE_TIMESTAMP
-		size = 23 // 20 + s (the number of characters in the yyyy-mm-dd hh:mm:ss[.fff...] format, where s is the seconds precision).
+		// represented as yyyy-mm-dd hh:mm:ss.fff format in ms sql server
+		decimal = 3
+		size = 20 + api.SQLULEN(decimal)
 	case []byte:
 		ctype = api.SQL_C_BINARY
 		b := make([]byte, len(d))
 		copy(b, d)
-		p.Data = &b[0]
+		p.Data = b
 		buf = unsafe.Pointer(&b[0])
 		buflen = api.SQLLEN(len(b))
-		plen = buflen
+		plen = p.StoreStrLen_or_IndPtr(buflen)
 		size = api.SQLULEN(len(b))
 		sqltype = api.SQL_BINARY
 	default:
 		panic(fmt.Errorf("unsupported type %T", v))
 	}
-	if p.isDescribed {
-		sqltype = p.SQLType
-		decimal = p.Decimal
-		size = p.Size
-	}
 	ret := api.SQLBindParameter(h, api.SQLUSMALLINT(idx+1),
 		api.SQL_PARAM_INPUT, ctype, sqltype, size, decimal,
-		api.SQLPOINTER(buf), buflen, &plen)
+		api.SQLPOINTER(buf), buflen, plen)
 	if IsError(ret) {
 		return NewError("SQLBindParameter", h)
 	}
@@ -129,7 +152,8 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 			ret = api.SQLDescribeParam(h, api.SQLUSMALLINT(i+1),
 				&p.SQLType, &p.Size, &p.Decimal, &nullable)
 			if IsError(ret) {
-				return nil, NewError("SQLDescribeParam", h)
+				// will try request without these descriptions
+				continue
 			}
 			p.isDescribed = true
 		}

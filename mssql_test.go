@@ -230,7 +230,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 			age:       3,
 			isGirl:    false,
 			weight:    26.12,
-			dob:       time.Date(2009, 5, 10, 11, 1, 1, 0, time.Local),
+			dob:       time.Date(2009, 5, 10, 11, 1, 1, 123e6, time.Local),
 			data:      []byte{0x0},
 			canBeNull: sql.NullString{"bbb", true},
 		},
@@ -963,5 +963,152 @@ func TestMSSQLDeleteNonExistent(t *testing.T) {
 		t.Fatalf("RowsAffected returns %d, but 0 expected", cnt)
 	}
 
+	exec(t, db, "drop table dbo.temp")
+}
+
+// https://code.google.com/p/odbc/issues/detail?id=19
+func TestMSSQLMerge(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	if !is2008OrLater(db) {
+		t.Skip("skipping test; needs MS SQL Server 2008 or later")
+	}
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `
+		create table dbo.temp (
+			id int not null,
+			name varchar(20),
+			constraint pk_temp primary key(id)
+		)
+	`)
+	for i := 0; i < 5; i++ {
+		_, err = db.Exec("insert into dbo.temp (id, name) values (?, ?)", i, fmt.Sprintf("gordon%d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	s, err := db.Prepare(`
+		merge into dbo.temp as dest
+		using ( values (?, ?) ) as src (id, name) on src.id = dest.id
+		when matched then update set dest.name = src.name
+		when not matched then insert values (src.id, src.name);
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	var tests = []struct {
+		id   int
+		name string
+	}{
+		{id: 1, name: "new name1"},
+		{id: 8, name: "hohoho"},
+	}
+	for _, test := range tests {
+		_, err = s.Exec(test.id, test.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, test := range tests {
+		var got string
+		err = db.QueryRow("select name from dbo.temp where id = ?", test.id).Scan(&got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.name != got {
+			t.Fatalf("expect %v, but got %v", test.name, got)
+		}
+	}
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+// https://code.google.com/p/odbc/issues/detail?id=20
+func TestMSSQLSelectInt(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	const expect = 123456
+	var got int
+	if err := db.QueryRow("select ?", expect).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if expect != got {
+		t.Fatalf("expect %v, but got %v", expect, got)
+	}
+}
+
+// https://code.google.com/p/odbc/issues/detail?id=21
+func TestMSSQLTextColumnParam(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp(id int primary key not null, v1 text, v2 text, v3 text, v4 text, v5 text, v6 text, v7 text, v8 text)`)
+
+	s, err := db.Prepare(`insert into dbo.temp(id, v1, v2, v3, v4, v5, v6, v7, v8) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	b := "string string string string string string string string string"
+	for i := 0; i < 100; i++ {
+		_, err := s.Exec(i, b, b, b, b, b, b, b, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+var paramTypeTests = []struct {
+	description string
+	sqlType     string
+	value       interface{}
+}{
+	// nil parameters
+	{"NULL for bit", "bit", nil},
+	{"NULL for text", "text", nil},
+	{"NULL for int", "int", nil},
+	// strings
+	{"non empty string", "varchar(10)", "abc"},
+	{"empty string", "varchar(10)", ""},
+	{"large string value", "text", strings.Repeat("a", 10000)},
+	// datetime
+	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.UTC)},
+}
+
+func TestMSSQLTextColumnParamTypes(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	for _, test := range paramTypeTests {
+		db.Exec("drop table dbo.temp")
+		exec(t, db, fmt.Sprintf("create table dbo.temp(v %s)", test.sqlType))
+		_, err = db.Exec("insert into dbo.temp(v) values(?)", test.value)
+		if err != nil {
+			t.Errorf("%s test failed: %s", test.description, err)
+		}
+	}
 	exec(t, db, "drop table dbo.temp")
 }
