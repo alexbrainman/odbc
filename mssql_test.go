@@ -1112,3 +1112,21 @@ func TestMSSQLTextColumnParamTypes(t *testing.T) {
 	}
 	exec(t, db, "drop table dbo.temp")
 }
+
+func TestMSSQLLongColumnNames(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	query := fmt.Sprintf("select 'hello' as %s", strings.Repeat("a", 110))
+	var s string
+	err = db.QueryRow(query).Scan(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != "hello" {
+		t.Errorf("expected \"hello\", but received %v", s)
+	}
+}

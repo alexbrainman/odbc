@@ -7,6 +7,7 @@ package odbc
 import (
 	"code.google.com/p/odbc/api"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"time"
 	"unsafe"
@@ -37,21 +38,35 @@ type Column interface {
 	Value(h api.SQLHSTMT, idx int) (driver.Value, error)
 }
 
+func describeColumn(h api.SQLHSTMT, idx int, namebuf []uint16) (namelen int, sqltype api.SQLSMALLINT, size api.SQLULEN, ret api.SQLRETURN) {
+	var l, decimal, nullable api.SQLSMALLINT
+	ret = api.SQLDescribeCol(h, api.SQLUSMALLINT(idx+1),
+		(*api.SQLWCHAR)(unsafe.Pointer(&namebuf[0])),
+		api.SQLSMALLINT(len(namebuf)), &l,
+		&sqltype, &size, &decimal, &nullable)
+	return int(l), sqltype, size, ret
+}
+
 // TODO(brainman): did not check for MS SQL timestamp
 
 func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
-	namebuf := make([]uint16, 100)
-	var namelen, sqltype, decimal, nullable api.SQLSMALLINT
-	var size api.SQLULEN
-	b := &BaseColumn{}
-	ret := api.SQLDescribeCol(h, api.SQLUSMALLINT(idx+1),
-		(*api.SQLWCHAR)(unsafe.Pointer(&namebuf[0])),
-		api.SQLSMALLINT(len(namebuf)), &namelen,
-		&sqltype, &size, &decimal, &nullable)
+	namebuf := make([]uint16, 150)
+	namelen, sqltype, size, ret := describeColumn(h, idx, namebuf)
+	if ret == api.SQL_SUCCESS_WITH_INFO && namelen > len(namebuf) {
+		// try again with bigger buffer
+		namebuf = make([]uint16, namelen)
+		namelen, sqltype, size, ret = describeColumn(h, idx, namebuf)
+	}
 	if IsError(ret) {
 		return nil, NewError("SQLDescribeCol", h)
 	}
-	b.name = api.UTF16ToString(namebuf[:namelen])
+	if namelen > len(namebuf) {
+		// still complaining about buffer size
+		return nil, errors.New("Failed to allocate column name buffer")
+	}
+	b := &BaseColumn{
+		name: api.UTF16ToString(namebuf[:namelen]),
+	}
 	switch sqltype {
 	case api.SQL_BIT:
 		return NewBindableColumn(b, api.SQL_C_BIT, 1), nil
