@@ -5,13 +5,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build linux
+// +build darwin linux
 // +build cgo
 
 package api
 
 import "unsafe"
 
+// #cgo darwin LDFLAGS: -lodbc -L/opt/local/lib
+// #cgo darwin CFLAGS: -I/opt/local/include
 // #cgo linux LDFLAGS: -lodbc
 // #include <sql.h>
 // #include <sqlext.h>

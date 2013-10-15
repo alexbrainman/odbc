@@ -5,11 +5,11 @@
 all: zapi_windows.go zapi_unix.go
 
 zapi_windows.go: api.go
-	GOOS=windows $(GOROOT)/src/pkg/syscall/mksyscall_windows.pl $^ \
+	$(GOROOT)/src/pkg/syscall/mksyscall_windows.pl $^ \
 		| gofmt \
 		> $@
 
 zapi_unix.go: api.go
-	GOOS=linux ./mksyscall_unix.pl $^ \
+	./mksyscall_unix.pl $^ \
 		| gofmt \
 		> $@
