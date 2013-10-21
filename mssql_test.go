@@ -428,17 +428,26 @@ func match(a interface{}) matchFunc {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
 		case bool:
-			expect := a.(bool)
+			expect, ok := a.(bool)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if got != expect {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
 		case int32:
-			expect := a.(int32)
+			expect, ok := a.(int32)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if got != expect {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
 		case int64:
-			expect := a.(int64)
+			expect, ok := a.(int64)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if got != expect {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
@@ -456,17 +465,26 @@ func match(a interface{}) matchFunc {
 				return fmt.Errorf("unsupported type %T", expect)
 			}
 		case string:
-			expect := a.(string)
+			expect, ok := a.(string)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if got != expect {
 				return fmt.Errorf("expect %q, but got %q", expect, got)
 			}
 		case []byte:
-			expect := a.([]byte)
+			expect, ok := a.([]byte)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if !equal(got, expect) {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
 		case time.Time:
-			expect := a.(time.Time)
+			expect, ok := a.(time.Time)
+			if !ok {
+				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
+			}
 			if !got.Equal(expect) {
 				return fmt.Errorf("expect %q, but got %q", expect, got)
 			}
