@@ -107,8 +107,13 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		p.Data = &b
 		buf = unsafe.Pointer(&b)
 		sqltype = api.SQL_TYPE_TIMESTAMP
-		// represented as yyyy-mm-dd hh:mm:ss.fff format in ms sql server
-		decimal = 3
+		if p.isDescribed && p.SQLType == api.SQL_TYPE_TIMESTAMP {
+			decimal = p.Decimal
+		}
+		if decimal <= 0 {
+			// represented as yyyy-mm-dd hh:mm:ss.fff format in ms sql server
+			decimal = 3
+		}
 		size = 20 + api.SQLULEN(decimal)
 	case []byte:
 		ctype = api.SQL_C_BINARY

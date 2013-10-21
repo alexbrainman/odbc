@@ -984,6 +984,38 @@ func TestMSSQLDeleteNonExistent(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
+// https://code.google.com/p/odbc/issues/detail?id=14
+func TestMSSQLDatetime2Param(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	if !is2008OrLater(db) {
+		t.Skip("skipping test; needs MS SQL Server 2008 or later")
+	}
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, "create table dbo.temp (dt datetime2)")
+
+	expect := time.Date(2007, 5, 8, 12, 35, 29, 1234567e2, time.Local)
+	_, err = db.Exec("insert into dbo.temp (dt) values (?)", expect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got time.Time
+	err = db.QueryRow("select top 1 dt from dbo.temp").Scan(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expect != got {
+		t.Fatalf("expect %v, but got %v", expect, got)
+	}
+
+	exec(t, db, "drop table dbo.temp")
+}
+
 // https://code.google.com/p/odbc/issues/detail?id=19
 func TestMSSQLMerge(t *testing.T) {
 	db, sc, err := mssqlConnect()
