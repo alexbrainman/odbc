@@ -546,14 +546,14 @@ var typeTests = []typeTest{
 	{"select cast(NULL as smallmoney)", match(nil)},
 
 	// strings
-	{"select cast(123 as varchar(21))", match("123")},
-	{"select cast(123 as char(5))", match("123  ")},
-	{"select cast('abcde' as varchar(3))", match("abc")},
-	{"select cast('' as varchar(5))", match("")},
+	{"select cast(123 as varchar(21))", match([]byte("123"))},
+	{"select cast(123 as char(5))", match([]byte("123  "))},
+	{"select cast('abcde' as varchar(3))", match([]byte("abc"))},
+	{"select cast('' as varchar(5))", match([]byte(""))},
 	{"select cast(NULL as varchar(5))", match(nil)},
-	{"select cast(123 as nvarchar(21))", match("123")},
-	{"select cast('abcde' as nvarchar(3))", match("abc")},
-	{"select cast('' as nvarchar(5))", match("")},
+	{"select cast(123 as nvarchar(21))", match([]byte("123"))},
+	{"select cast('abcde' as nvarchar(3))", match([]byte("abc"))},
+	{"select cast('' as nvarchar(5))", match(nil)},
 	{"select cast(NULL as nvarchar(5))", match(nil)},
 
 	// datetime, smalldatetime
@@ -567,17 +567,17 @@ var typeTests = []typeTest{
 	{"select cast(NULL as uniqueidentifier)", match(nil)},
 
 	// string blobs
-	{"select cast('abc' as varchar(max))", match("abc")},
-	{fmt.Sprintf("select cast('%s' as varchar(max))", veryLongString), match(veryLongString)},
+	{"select cast('abc' as varchar(max))", match([]byte("abc"))},
+	{fmt.Sprintf("select cast('%s' as varchar(max))", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as varchar(max))", match(nil)},
-	{"select cast('abc' as nvarchar(max))", match("abc")},
-	{fmt.Sprintf("select cast('%s' as nvarchar(max))", veryLongString), match(veryLongString)},
+	{"select cast('abc' as nvarchar(max))", match([]byte("abc"))},
+	{fmt.Sprintf("select cast('%s' as nvarchar(max))", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as nvarchar(max))", match(nil)},
-	{"select cast('abc' as text)", match("abc")},
-	{fmt.Sprintf("select cast('%s' as text)", veryLongString), match(veryLongString)},
+	{"select cast('abc' as text)", match([]byte("abc"))},
+	{fmt.Sprintf("select cast('%s' as text)", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as text)", match(nil)},
-	{"select cast('abc' as ntext)", match("abc")},
-	{fmt.Sprintf("select cast('%s' as ntext)", veryLongString), match(veryLongString)},
+	{"select cast('abc' as ntext)", match([]byte("abc"))},
+	{fmt.Sprintf("select cast('%s' as ntext)", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as ntext)", match(nil)},
 
 	// binary blobs
@@ -593,11 +593,11 @@ var typeTests = []typeTest{
 // TODO(brainman): see why typeWindowsSpecificTests do not work on linux
 
 var typeWindowsSpecificTests = []typeTest{
-	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match("\u0421\u0430\u0448\u0430")},
-	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match("\u0421\u0430\u0448\u0430")},
-	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match("\u0421\u0430\u0448\u0430")},
-	{"select cast(N'<root>hello</root>' as xml)", match("<root>hello</root>")},
-	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match("<root><doc><item1>dd</item1></doc></root>")},
+	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match([]byte("\u0421\u0430\u0448\u0430"))},
+	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match([]byte("\u0421\u0430\u0448\u0430"))},
+	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match([]byte("\u0421\u0430\u0448\u0430"))},
+	{"select cast(N'<root>hello</root>' as xml)", match([]byte("<root>hello</root>"))},
+	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match([]byte("<root><doc><item1>dd</item1></doc></root>"))},
 }
 
 var typeMSSQL2008Tests = []typeTest{
@@ -1179,4 +1179,34 @@ func TestMSSQLLongColumnNames(t *testing.T) {
 	if s != "hello" {
 		t.Errorf("expected \"hello\", but received %v", s)
 	}
+}
+
+func TestRawBytes(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp(ascii char(7), utf16 nchar(7), blob binary(3))`)
+	_, err = db.Exec(`insert into dbo.temp (ascii, utf16, blob) values (?, ?, ?)`, "alex", "alex", []byte{1, 2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := db.Query("select ascii, utf16, blob from dbo.temp")
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	for rows.Next() {
+		var ascii, utf16 sql.RawBytes
+		var blob []byte
+		err = rows.Scan(&ascii, &utf16, &blob)
+		if err != nil {
+			t.Fatalf("Scan: %v", err)
+		}
+	}
+
+	exec(t, db, "drop table dbo.temp")
 }

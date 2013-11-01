@@ -128,13 +128,13 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 	case api.SQL_C_DOUBLE:
 		return *((*float64)(p)), nil
 	case api.SQL_C_CHAR:
-		return string(buf), nil
+		return buf, nil
 	case api.SQL_C_WCHAR:
 		if p == nil {
-			return "", nil
+			return nil, nil
 		}
 		s := (*[1 << 20]uint16)(p)[:len(buf)/2]
-		return api.UTF16ToString(s), nil
+		return utf16toutf8(s), nil
 	case api.SQL_C_TYPE_TIMESTAMP:
 		t := (*api.SQL_TIMESTAMP_STRUCT)(p)
 		r := time.Date(int(t.Year), time.Month(t.Month), int(t.Day),
