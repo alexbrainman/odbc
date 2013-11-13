@@ -1181,7 +1181,7 @@ func TestMSSQLLongColumnNames(t *testing.T) {
 	}
 }
 
-func TestRawBytes(t *testing.T) {
+func TestMSSQLRawBytes(t *testing.T) {
 	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
