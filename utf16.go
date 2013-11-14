@@ -46,6 +46,7 @@ func utf16toutf8(s []uint16) []byte {
 			// normal rune
 			rr = rune(r)
 		}
+		b := b[:cap(b)]
 		n := utf8.EncodeRune(b, rr)
 		b = b[:n]
 		buf = append(buf, b...)
