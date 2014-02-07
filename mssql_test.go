@@ -36,30 +36,28 @@ func defaultDriver() string {
 	}
 }
 
+func isFreeTDS() bool {
+	return *msdriver == "freetds"
+}
+
 func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
-	var params map[string]string
-	if runtime.GOOS == "windows" {
-		params = map[string]string{
-			"driver":   *msdriver,
-			"server":   *mssrv,
-			"database": *msdb,
-		}
+	params := map[string]string{
+		"driver":   *msdriver,
+		"server":   *mssrv,
+		"database": *msdb,
+	}
+	if isFreeTDS() {
+		params["uid"] = *msuser
+		params["pwd"] = *mspass
+		params["port"] = *msport
+		//params["clientcharset"] = "UTF-8"
+		//params["debugflags"] = "0xffff"
+	} else {
 		if len(*msuser) == 0 {
 			params["trusted_connection"] = "yes"
 		} else {
 			params["uid"] = *msuser
 			params["pwd"] = *mspass
-		}
-	} else {
-		params = map[string]string{
-			"driver":   *msdriver,
-			"server":   *mssrv,
-			"port":     *msport,
-			"database": *msdb,
-			"uid":      *msuser,
-			"pwd":      *mspass,
-			//"clientcharset": "UTF-8",
-			//"debugflags": "0xffff",
 		}
 	}
 	var c string
@@ -592,9 +590,9 @@ var typeTests = []typeTest{
 	{"select cast(NULL as varbinary(max))", match(nil)},
 }
 
-// TODO(brainman): see why typeWindowsSpecificTests do not work on linux
+// TODO(brainman): see why typeMSSpecificTests do not work on freetds
 
-var typeWindowsSpecificTests = []typeTest{
+var typeMSSpecificTests = []typeTest{
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match([]byte("\u0421\u0430\u0448\u0430"))},
@@ -633,8 +631,8 @@ func TestMSSQLTypes(t *testing.T) {
 	defer closeDB(t, db, sc, sc)
 
 	tests := typeTests
-	if runtime.GOOS == "windows" {
-		tests = append(tests, typeWindowsSpecificTests...)
+	if !isFreeTDS() {
+		tests = append(tests, typeMSSpecificTests...)
 	}
 	if is2008OrLater(db) {
 		tests = append(tests, typeMSSQL2008Tests...)

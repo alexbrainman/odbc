@@ -8,7 +8,6 @@ import (
 	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"fmt"
-	"runtime"
 	"time"
 	"unsafe"
 )
@@ -150,18 +149,17 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 	}
 	ps := make([]Parameter, n)
 	// fetch param descriptions
-	if runtime.GOOS == "windows" {
-		// SQLDescribeParam is not implemented by freedts
-		for i := range ps {
-			p := &ps[i]
-			ret = api.SQLDescribeParam(h, api.SQLUSMALLINT(i+1),
-				&p.SQLType, &p.Size, &p.Decimal, &nullable)
-			if IsError(ret) {
-				// will try request without these descriptions
-				continue
-			}
-			p.isDescribed = true
+	for i := range ps {
+		p := &ps[i]
+		ret = api.SQLDescribeParam(h, api.SQLUSMALLINT(i+1),
+			&p.SQLType, &p.Size, &p.Decimal, &nullable)
+		if IsError(ret) {
+			// SQLDescribeParam is not implemented by freedts,
+			// it even fails for some statements on windows.
+			// Will try request without these descriptions
+			continue
 		}
+		p.isDescribed = true
 	}
 	return ps, nil
 }
