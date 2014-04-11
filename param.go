@@ -123,7 +123,12 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		buflen = api.SQLLEN(len(b))
 		plen = p.StoreStrLen_or_IndPtr(buflen)
 		size = api.SQLULEN(len(b))
-		sqltype = api.SQL_BINARY
+		if p.isDescribed {
+			// only so we can handle very long (>8000 bytes) parameters
+			sqltype = p.SQLType
+		} else {
+			sqltype = api.SQL_BINARY
+		}
 	default:
 		panic(fmt.Errorf("unsupported type %T", v))
 	}

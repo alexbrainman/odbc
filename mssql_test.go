@@ -1143,6 +1143,8 @@ var paramTypeTests = []struct {
 	{"large string value", "text", strings.Repeat("a", 10000)},
 	// datetime
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.UTC)},
+	// binary blobs
+	{"large image", "image", make([]byte, 10000)},
 }
 
 func TestMSSQLTextColumnParamTypes(t *testing.T) {
