@@ -131,7 +131,7 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 		return buf, nil
 	case api.SQL_C_WCHAR:
 		if p == nil {
-			return nil, nil
+			return buf, nil
 		}
 		s := (*[1 << 20]uint16)(p)[:len(buf)/2]
 		return utf16toutf8(s), nil

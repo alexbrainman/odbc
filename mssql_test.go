@@ -553,7 +553,7 @@ var typeTests = []typeTest{
 	{"select cast(NULL as varchar(5))", match(nil)},
 	{"select cast(123 as nvarchar(21))", match([]byte("123"))},
 	{"select cast('abcde' as nvarchar(3))", match([]byte("abc"))},
-	{"select cast('' as nvarchar(5))", match(nil)},
+	{"select cast('' as nvarchar(5))", match([]byte(""))},
 	{"select cast(NULL as nvarchar(5))", match(nil)},
 
 	// datetime, smalldatetime
@@ -568,24 +568,31 @@ var typeTests = []typeTest{
 
 	// string blobs
 	{"select cast('abc' as varchar(max))", match([]byte("abc"))},
+	{"select cast('' as varchar(max))", match([]byte(""))},
 	{fmt.Sprintf("select cast('%s' as varchar(max))", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as varchar(max))", match(nil)},
 	{"select cast('abc' as nvarchar(max))", match([]byte("abc"))},
+	{"select cast('' as nvarchar(max))", match([]byte(""))},
 	{fmt.Sprintf("select cast('%s' as nvarchar(max))", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as nvarchar(max))", match(nil)},
 	{"select cast('abc' as text)", match([]byte("abc"))},
+	{"select cast('' as text)", match([]byte(""))},
 	{fmt.Sprintf("select cast('%s' as text)", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as text)", match(nil)},
 	{"select cast('abc' as ntext)", match([]byte("abc"))},
+	{"select cast('' as ntext)", match([]byte(""))},
 	{fmt.Sprintf("select cast('%s' as ntext)", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as ntext)", match(nil)},
 
 	// binary blobs
 	{"select cast('abc' as binary(5))", match([]byte{'a', 'b', 'c', 0, 0})},
+	{"select cast('' as binary(5))", match([]byte{0, 0, 0, 0, 0})},
 	{"select cast(NULL as binary(5))", match(nil)},
 	{"select cast('abc' as varbinary(5))", match([]byte{'a', 'b', 'c'})},
+	{"select cast('' as varbinary(5))", match([]byte(""))},
 	{"select cast(NULL as varbinary(5))", match(nil)},
 	{"select cast('abc' as varbinary(max))", match([]byte{'a', 'b', 'c'})},
+	{"select cast('' as varbinary(max))", match([]byte(""))},
 	{fmt.Sprintf("select cast('%s' as varbinary(max))", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as varbinary(max))", match(nil)},
 }
