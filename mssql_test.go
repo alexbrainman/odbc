@@ -1135,6 +1135,27 @@ func TestMSSQLTextColumnParam(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
+func digestString(s string) string {
+	if len(s) < 40 {
+		return s
+	}
+	return fmt.Sprintf("%s ... (%d bytes long)", s[:40], len(s))
+}
+
+func digestBytes(b []byte) string {
+	if len(b) < 20 {
+		return fmt.Sprintf("%v", b)
+	}
+	s := ""
+	for _, v := range b[:20] {
+		if s != "" {
+			s += " "
+		}
+		s += fmt.Sprintf("%d", v)
+	}
+	return fmt.Sprintf("[%v ...] (%d bytes long)", s, len(b))
+}
+
 var paramTypeTests = []struct {
 	description string
 	sqlType     string
@@ -1147,11 +1168,15 @@ var paramTypeTests = []struct {
 	// strings
 	{"non empty string", "varchar(10)", "abc"},
 	{"empty string", "varchar(10)", ""},
-	{"large string value", "text", strings.Repeat("a", 10000)},
+	{"empty unicode string", "nvarchar(10)", ""},
+	{"empty unicode null string", "nvarchar(10) null", ""},
+	{"large string value", "text", strings.Repeat("a", 4000)},
+	{"very large string value", "text", strings.Repeat("a", 10000)},
 	// datetime
-	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.UTC)},
+	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
 	// binary blobs
-	{"large image", "image", make([]byte, 10000)},
+	{"large image", "image", make([]byte, 8000)},
+	{"very large image", "image", make([]byte, 10000)},
 }
 
 func TestMSSQLTextColumnParamTypes(t *testing.T) {
@@ -1166,7 +1191,34 @@ func TestMSSQLTextColumnParamTypes(t *testing.T) {
 		exec(t, db, fmt.Sprintf("create table dbo.temp(v %s)", test.sqlType))
 		_, err = db.Exec("insert into dbo.temp(v) values(?)", test.value)
 		if err != nil {
-			t.Errorf("%s test failed: %s", test.description, err)
+			t.Errorf("%s insert test failed: %s", test.description, err)
+		}
+		var v interface{}
+		err = db.QueryRow("select v from dbo.temp").Scan(&v)
+		if err != nil {
+			t.Errorf("%s select test failed: %s", test.description, err)
+			continue
+		}
+		switch want := test.value.(type) {
+		case string:
+			have := string(v.([]byte))
+			if have != want {
+				t.Errorf("%s wrong return value: have %q; want %q", test.description, digestString(have), digestString(want))
+			}
+		case []byte:
+			have := v.([]byte)
+			if !equal(have, want) {
+				t.Errorf("%s wrong return value: have %v; want %v", test.description, digestBytes(have), digestBytes(want))
+			}
+		case time.Time:
+			have := v.(time.Time)
+			if have != want {
+				t.Errorf("%s wrong return value: have %v; want %v", test.description, have, want)
+			}
+		case nil:
+			if v != nil {
+				t.Errorf("%s wrong return value: have %v; want nil", test.description, v)
+			}
 		}
 	}
 	exec(t, db, "drop table dbo.temp")
