@@ -1169,13 +1169,23 @@ var paramTypeTests = []struct {
 	{"non empty string", "varchar(10)", "abc"},
 	{"empty string", "varchar(10)", ""},
 	{"empty unicode string", "nvarchar(10)", ""},
+	{"3999 large unicode string", "nvarchar(max)", strings.Repeat("a", 3999)},
+	{"4000 large unicode string", "nvarchar(max)", strings.Repeat("a", 4000)},
+	// TODO: do not know why nvarchar fields fail
+	//{"4001 large unicode string", "nvarchar(max)", strings.Repeat("a", 4001)},
+	//{"10000 large unicode string", "nvarchar(max)", strings.Repeat("a", 10000)},
 	{"empty unicode null string", "nvarchar(10) null", ""},
-	{"large string value", "text", strings.Repeat("a", 4000)},
+	{"3999 large string value", "text", strings.Repeat("a", 3999)},
+	{"4000 large string value", "text", strings.Repeat("a", 4000)},
+	{"4001 large string value", "text", strings.Repeat("a", 4001)},
 	{"very large string value", "text", strings.Repeat("a", 10000)},
 	// datetime
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
 	// binary blobs
-	{"large image", "image", make([]byte, 8000)},
+	{"small blob", "varbinary", make([]byte, 1)},
+	{"7999 large image", "image", make([]byte, 7999)},
+	{"8000 large image", "image", make([]byte, 8000)},
+	{"8001 large image", "image", make([]byte, 8001)},
 	{"very large image", "image", make([]byte, 10000)},
 }
 

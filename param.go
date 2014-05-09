@@ -63,10 +63,14 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		l *= 2 // every char takes 2 bytes
 		buflen = api.SQLLEN(l)
 		plen = p.StoreStrLen_or_IndPtr(buflen)
-		if p.isDescribed {
-			// only so we can handle very long (>4000 chars) parameters
+		switch {
+		case p.isDescribed:
 			sqltype = p.SQLType
-		} else {
+		case size <= 1:
+			sqltype = api.SQL_LONGVARCHAR
+		case size >= 4000:
+			sqltype = api.SQL_LONGVARCHAR
+		default:
 			sqltype = api.SQL_WCHAR
 		}
 	case int64:
@@ -123,10 +127,14 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		buflen = api.SQLLEN(len(b))
 		plen = p.StoreStrLen_or_IndPtr(buflen)
 		size = api.SQLULEN(len(b))
-		if p.isDescribed {
-			// only so we can handle very long (>8000 bytes) parameters
+		switch {
+		case p.isDescribed:
 			sqltype = p.SQLType
-		} else {
+		case size <= 0:
+			sqltype = api.SQL_LONGVARBINARY
+		case size >= 8000:
+			sqltype = api.SQL_LONGVARBINARY
+		default:
 			sqltype = api.SQL_BINARY
 		}
 	default:
