@@ -1289,3 +1289,35 @@ func TestMSSQLUTF16ToUTF8(t *testing.T) {
 		t.Fatal("comparison fails")
 	}
 }
+
+func TestMSSQLExecStoredProcedure(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop procedure dbo.temp")
+	exec(t, db, `
+create procedure dbo.temp
+	@a	int,
+	@b	int
+as
+begin
+	return @a + @b
+end
+`)
+	qry := `
+declare @ret int
+exec @ret = dbo.temp @a = ?, @b = ?
+select @ret
+`
+	var ret int64
+	if err := db.QueryRow(qry, 2, 3).Scan(&ret); err != nil {
+		t.Fatal(err)
+	}
+	if ret != 5 {
+		t.Fatalf("unexpected return value: should=5, is=%v", ret)
+	}
+	exec(t, db, `drop procedure dbo.temp`)
+}
