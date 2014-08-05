@@ -26,7 +26,7 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 
 	b := api.StringToUTF16(dsn)
 	ret = api.SQLDriverConnect(h, 0,
-		(*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQLSMALLINT(len(b)),
+		(*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS,
 		nil, 0, nil, api.SQL_DRIVER_NOPROMPT)
 	if IsError(ret) {
 		defer releaseHandle(h)
