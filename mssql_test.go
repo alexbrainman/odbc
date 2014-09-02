@@ -1167,17 +1167,21 @@ var paramTypeTests = []struct {
 	{"NULL for int", "int", nil},
 	// strings
 	{"non empty string", "varchar(10)", "abc"},
+	{"one character string", "varchar(10)", "a"},
 	{"empty string", "varchar(10)", ""},
 	{"empty unicode string", "nvarchar(10)", ""},
 	{"3999 large unicode string", "nvarchar(max)", strings.Repeat("a", 3999)},
 	{"4000 large unicode string", "nvarchar(max)", strings.Repeat("a", 4000)},
-	// TODO: do not know why nvarchar fields fail
-	//{"4001 large unicode string", "nvarchar(max)", strings.Repeat("a", 4001)},
-	//{"10000 large unicode string", "nvarchar(max)", strings.Repeat("a", 10000)},
+	{"4000 large non-ascii unicode string", "nvarchar(max)", strings.Repeat("\u0421", 4000)},
+	{"4001 large unicode string", "nvarchar(max)", strings.Repeat("a", 4001)},
+	{"4001 large non-ascii unicode string", "nvarchar(max)", strings.Repeat("\u0421", 4001)},
+	{"10000 large unicode string", "nvarchar(max)", strings.Repeat("a", 10000)},
 	{"empty unicode null string", "nvarchar(10) null", ""},
 	{"3999 large string value", "text", strings.Repeat("a", 3999)},
 	{"4000 large string value", "text", strings.Repeat("a", 4000)},
+	{"4000 large unicode string value", "ntext", strings.Repeat("\u0421", 4000)},
 	{"4001 large string value", "text", strings.Repeat("a", 4001)},
+	{"4001 large unicode string value", "ntext", strings.Repeat("\u0421", 4001)},
 	{"very large string value", "text", strings.Repeat("a", 10000)},
 	// datetime
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
@@ -1320,4 +1324,23 @@ select @ret
 		t.Fatalf("unexpected return value: should=5, is=%v", ret)
 	}
 	exec(t, db, `drop procedure dbo.temp`)
+}
+
+func TestMSSQLSingleCharParam(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp(name nvarchar(50), age int)`)
+
+	rows, err := db.Query("select age from dbo.temp where name=?", "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	exec(t, db, "drop table dbo.temp")
 }
