@@ -192,7 +192,7 @@ func NewBindableColumn(b *BaseColumn, ctype api.SQLSMALLINT, bufSize int) *Binda
 }
 
 func NewVariableWidthColumn(b *BaseColumn, ctype api.SQLSMALLINT, colWidth api.SQLULEN) Column {
-	if colWidth == 0 {
+	if colWidth == 0 || colWidth > 1024 {
 		b.CType = ctype
 		return &NonBindableColumn{b}
 	}
@@ -262,6 +262,9 @@ loop:
 			if l.IsNull() {
 				// is NULL
 				return nil, nil
+			}
+			if int(l) > len(b) {
+				return nil, fmt.Errorf("too much data returned: %d bytes returned, but buffer size is %d", l, cap(b))
 			}
 			total = append(total, b[:l]...)
 			break loop

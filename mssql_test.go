@@ -584,6 +584,10 @@ var typeTests = []typeTest{
 	{fmt.Sprintf("select cast('%s' as ntext)", veryLongString), match([]byte(veryLongString))},
 	{"select cast(NULL as ntext)", match(nil)},
 
+	// xml
+	{"select cast(N'<root>hello</root>' as xml)", match([]byte("<root>hello</root>"))},
+	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match([]byte("<root><doc><item1>dd</item1></doc></root>"))},
+
 	// binary blobs
 	{"select cast('abc' as binary(5))", match([]byte{'a', 'b', 'c', 0, 0})},
 	{"select cast('' as binary(5))", match([]byte{0, 0, 0, 0, 0})},
@@ -603,8 +607,6 @@ var typeMSSpecificTests = []typeTest{
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match([]byte("\u0421\u0430\u0448\u0430"))},
-	{"select cast(N'<root>hello</root>' as xml)", match([]byte("<root>hello</root>"))},
-	{"select cast(N'<root><doc><item1>dd</item1></doc></root>' as xml)", match([]byte("<root><doc><item1>dd</item1></doc></root>"))},
 }
 
 var typeMSSQL2008Tests = []typeTest{
