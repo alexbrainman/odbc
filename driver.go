@@ -31,26 +31,25 @@ func initDriver() error {
 	drv.Stats.updateHandleCount(api.SQL_HANDLE_ENV, 1)
 
 	// will use ODBC v3
-	ret = api.SQLSetEnvAttr(drv.h, api.SQL_ATTR_ODBC_VERSION,
-		api.SQLPOINTER(api.SQL_OV_ODBC3), 0)
+	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_ODBC_VERSION, api.SQL_OV_ODBC3, 0)
 	if IsError(ret) {
 		defer releaseHandle(drv.h)
-		return NewError("SQLSetEnvAttr", drv.h)
+		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
 	}
 
 	//TODO: find a way to make this attribute changeable at runtime
 	//Enable connection pooling
-	ret = api.SQLSetEnvAttr(drv.h, api.SQL_ATTR_CONNECTION_POOLING, api.SQLPOINTER(api.SQL_CP_ONE_PER_HENV), api.SQL_IS_UINTEGER)
+	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CONNECTION_POOLING, api.SQL_CP_ONE_PER_HENV, api.SQL_IS_UINTEGER)
 	if IsError(ret) {
 		defer releaseHandle(drv.h)
-		return NewError("SQLSetEnvAttr", drv.h)
+		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
 	}
 
 	//Set relaxed connection pool matching
-	ret = api.SQLSetEnvAttr(drv.h, api.SQL_ATTR_CP_MATCH, api.SQLPOINTER(api.SQL_CP_RELAXED_MATCH), api.SQL_IS_UINTEGER)
+	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CP_MATCH, api.SQL_CP_RELAXED_MATCH, api.SQL_IS_UINTEGER)
 	if IsError(ret) {
 		defer releaseHandle(drv.h)
-		return NewError("SQLSetEnvAttr", drv.h)
+		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
 	}
 
 	//TODO: it would be nice if we could call "drv.SetMaxIdleConns(0)" here but from the docs it looks like

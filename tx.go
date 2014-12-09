@@ -15,10 +15,10 @@ type Tx struct {
 }
 
 func (c *Conn) setAutoCommitAttr(a uintptr) error {
-	ret := api.SQLSetConnectAttr(c.h, api.SQL_ATTR_AUTOCOMMIT,
-		api.SQLPOINTER(a), api.SQL_IS_UINTEGER)
+	ret := api.SQLSetConnectUIntPtrAttr(c.h, api.SQL_ATTR_AUTOCOMMIT,
+		a, api.SQL_IS_UINTEGER)
 	if IsError(ret) {
-		return NewError("SQLSetConnectAttr", c.h)
+		return NewError("SQLSetConnectUIntPtrAttr", c.h)
 	}
 	return nil
 }
