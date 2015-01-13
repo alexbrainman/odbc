@@ -133,7 +133,7 @@ func serverVersion(db *sql.DB) (sqlVersion, sqlPartNumber, osVersion string, err
 	osVersion = a[3][i+4:]
 	sqlPartNumber = strings.Trim(l1[1], " ")
 	l12 := strings.SplitN(sqlPartNumber, " ", -1)
-	if len(l12) != 2 {
+	if len(l12) < 2 {
 		return "", "", "", errors.New("SQL Server version first line must have space after part number in it: " + v)
 	}
 	sqlPartNumber = l12[0]
