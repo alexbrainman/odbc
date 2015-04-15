@@ -5,6 +5,7 @@
 package odbc
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"flag"
@@ -169,21 +170,6 @@ func is2008OrLater(db *sql.DB) bool {
 	return true
 }
 
-func equal(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	if a == nil {
-		return true
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func exec(t *testing.T, db *sql.DB, query string) {
 	// TODO(brainman): make sure http://code.google.com/p/go/issues/detail?id=3678 is fixed
 	//r, err := db.Exec(query, a...)
@@ -312,7 +298,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 			t.Errorf("I did not know, that %s's date of birth is %v (%v expected)", name, is.dob, want.dob)
 			continue
 		}
-		if !equal(is.data, want.data) {
+		if !bytes.Equal(is.data, want.data) {
 			t.Errorf("I did not know, that %s's data is %v (%v expected)", name, is.data, want.data)
 			continue
 		}
@@ -477,7 +463,7 @@ func match(a interface{}) matchFunc {
 			if !ok {
 				return fmt.Errorf("couldn't convert expected value %v(%T) to %T", a, a, got)
 			}
-			if !equal(got, expect) {
+			if !bytes.Equal(got, expect) {
 				return fmt.Errorf("expect %v, but got %v", expect, got)
 			}
 		case time.Time:
@@ -1223,7 +1209,7 @@ func TestMSSQLTextColumnParamTypes(t *testing.T) {
 			}
 		case []byte:
 			have := v.([]byte)
-			if !equal(have, want) {
+			if !bytes.Equal(have, want) {
 				t.Errorf("%s wrong return value: have %v; want %v", test.description, digestBytes(have), digestBytes(want))
 			}
 		case time.Time:
