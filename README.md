@@ -4,3 +4,4 @@ To get started using odbc, have a look at the following pages:
   * [Getting started on Linux](GettingStartedOnLinux.md)
   * [Getting started on OS X](GettingStartedOnOSX.md)
   * [Getting started on Windows](GettingStartedOnWindows.md)
+
