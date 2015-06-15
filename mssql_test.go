@@ -10,9 +10,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"net"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,8 +44,10 @@ func isFreeTDS() bool {
 	return *msdriver == "freetds"
 }
 
-func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
-	params := map[string]string{
+type connParams map[string]string
+
+func newConnParams() connParams {
+	params := connParams{
 		"driver":   *msdriver,
 		"server":   *mssrv,
 		"database": *msdb,
@@ -61,15 +66,58 @@ func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 			params["pwd"] = *mspass
 		}
 	}
+	a := strings.SplitN(params["server"], ",", -1)
+	if len(a) == 2 {
+		params["server"] = a[0]
+		params["port"] = a[1]
+	}
+	return params
+}
+
+func (params connParams) getConnAddress() (string, error) {
+	port, ok := params["port"]
+	if !ok {
+		return "", errors.New("no port number provided.")
+	}
+	host, ok := params["server"]
+	if !ok {
+		return "", errors.New("no host name provided.")
+	}
+	return host + ":" + port, nil
+}
+
+func (params connParams) updateConnAddress(address string) error {
+	a := strings.SplitN(address, ":", -1)
+	if len(a) != 2 {
+		fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
+	}
+	params["server"] = a[0]
+	params["port"] = a[1]
+	return nil
+}
+
+func (params connParams) makeODBCConnectionString() string {
+	if port, ok := params["port"]; ok {
+		params["server"] += "," + port
+		delete(params, "port")
+	}
 	var c string
 	for n, v := range params {
 		c += n + "=" + v + ";"
 	}
-	db, err = sql.Open("odbc", c)
+	return c
+}
+
+func mssqlConnectWithParams(params connParams) (db *sql.DB, stmtCount int, err error) {
+	db, err = sql.Open("odbc", params.makeODBCConnectionString())
 	if err != nil {
 		return nil, 0, err
 	}
 	return db, db.Driver().(*Driver).Stats.StmtCount, nil
+}
+
+func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
+	return mssqlConnectWithParams(newConnParams())
 }
 
 func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
@@ -1329,6 +1377,134 @@ func TestMSSQLSingleCharParam(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rows.Close()
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+type tcpProxy struct {
+	mu      sync.Mutex
+	stopped bool
+	conns   []net.Conn
+}
+
+func (p *tcpProxy) pause() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.stopped = true
+	for _, c := range p.conns {
+		c.Close()
+	}
+	p.conns = p.conns[:0]
+}
+
+func (p *tcpProxy) paused() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.stopped
+}
+
+func (p *tcpProxy) addConn(c net.Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.conns = append(p.conns, c)
+}
+
+func (p *tcpProxy) restart() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.stopped = false
+}
+
+func TestMSSQLReconnect(t *testing.T) {
+	params := newConnParams()
+	address, err := params.getConnAddress()
+	if err != nil {
+		t.Skipf("Skipping test: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	err = params.updateConnAddress(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxy := new(tcpProxy)
+
+	go func() {
+		for {
+			c1, err := ln.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			go func(c1 net.Conn) {
+				defer c1.Close()
+
+				if proxy.paused() {
+					return
+				}
+
+				proxy.addConn(c1)
+
+				c2, err := net.Dial("tcp", address)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer c2.Close()
+
+				go func() {
+					io.Copy(c2, c1)
+				}()
+				io.Copy(c1, c2)
+			}(c1)
+		}
+	}()
+
+	db, sc, err := mssqlConnectWithParams(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	testConn := func() error {
+		var n int64
+		err := db.QueryRow("select count(*) from dbo.temp").Scan(&n)
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return fmt.Errorf("unexpected return value: should=1, is=%v", n)
+		}
+		return nil
+	}
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp (name varchar(50))`)
+	exec(t, db, `insert into dbo.temp (name) values ('alex')`)
+
+	err = testConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxy.pause()
+	time.Sleep(100 * time.Millisecond)
+
+	err = testConn()
+	if err == nil {
+		t.Fatal("database IO should fail, but succeeded")
+	}
+
+	proxy.restart()
+
+	err = testConn()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	exec(t, db, "drop table dbo.temp")
 }

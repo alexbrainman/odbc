@@ -6,6 +6,7 @@ package odbc
 
 import (
 	"code.google.com/p/odbc/api"
+	"database/sql/driver"
 	"fmt"
 	"strings"
 	"unsafe"
@@ -59,6 +60,9 @@ func NewError(apiName string, handle interface{}) error {
 			State:       api.UTF16ToString(state),
 			NativeError: int(ne),
 			Message:     api.UTF16ToString(msg),
+		}
+		if r.State == "08S01" {
+			return driver.ErrBadConn
 		}
 		err.Diag = append(err.Diag, r)
 	}
