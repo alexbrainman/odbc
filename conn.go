@@ -5,9 +5,10 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"unsafe"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 type Conn struct {

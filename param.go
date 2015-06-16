@@ -5,11 +5,12 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"fmt"
 	"time"
 	"unsafe"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 type Parameter struct {

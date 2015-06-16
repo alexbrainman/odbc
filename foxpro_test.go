@@ -5,12 +5,13 @@
 package odbc_test
 
 import (
-	_ "code.google.com/p/odbc"
 	"database/sql"
 	"flag"
 	"fmt"
 	"testing"
 	"time"
+
+	_ "github.com/alexbrainman/odbc"
 )
 
 var (

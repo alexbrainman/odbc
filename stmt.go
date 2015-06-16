@@ -5,10 +5,11 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"errors"
 	"sync"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 type Stmt struct {

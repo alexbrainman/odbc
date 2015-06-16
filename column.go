@@ -5,12 +5,13 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"time"
 	"unsafe"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 type BufferLen api.SQLLEN

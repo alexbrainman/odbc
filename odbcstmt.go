@@ -5,13 +5,14 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 // TODO(brainman): see if I could use SQLExecDirect anywhere

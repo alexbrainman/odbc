@@ -5,9 +5,10 @@
 package odbc
 
 import (
-	"code.google.com/p/odbc/api"
 	"fmt"
 	"sync"
+
+	"github.com/alexbrainman/odbc/api"
 )
 
 type Stats struct {
