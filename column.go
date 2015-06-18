@@ -77,6 +77,9 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 		return NewBindableColumn(b, api.SQL_C_SBIGINT, 8), nil
 	case api.SQL_NUMERIC, api.SQL_DECIMAL, api.SQL_FLOAT, api.SQL_REAL, api.SQL_DOUBLE:
 		return NewBindableColumn(b, api.SQL_C_DOUBLE, 8), nil
+	case api.SQL_TYPE_TIME:
+		var v api.SQL_TIMESTAMP_STRUCT
+		return NewBindableColumn(b, api.SQL_C_TYPE_TIMESTAMP, int(unsafe.Sizeof(v))), nil
 	case api.SQL_TYPE_TIMESTAMP:
 		var v api.SQL_TIMESTAMP_STRUCT
 		return NewBindableColumn(b, api.SQL_C_TYPE_TIMESTAMP, int(unsafe.Sizeof(v))), nil
@@ -136,7 +139,7 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 		}
 		s := (*[1 << 28]uint16)(p)[:len(buf)/2]
 		return utf16toutf8(s), nil
-	case api.SQL_C_TYPE_TIMESTAMP:
+	case api.SQL_C_TYPE_TIMESTAMP, api.SQL_TYPE_TIME:
 		t := (*api.SQL_TIMESTAMP_STRUCT)(p)
 		r := time.Date(int(t.Year), time.Month(t.Month), int(t.Day),
 			int(t.Hour), int(t.Minute), int(t.Second), int(t.Fraction),
