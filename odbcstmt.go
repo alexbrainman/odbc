@@ -44,8 +44,8 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 	}
 	ps, err := ExtractParameters(h)
 	if err != nil {
-		defer releaseHandle(h)
-		return nil, err
+		//		defer releaseHandle(h)
+		//		return nil, err
 	}
 	return &ODBCStmt{
 		h:          h,
