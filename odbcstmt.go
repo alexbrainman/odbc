@@ -39,13 +39,13 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 	b := api.StringToUTF16(query)
 	ret = api.SQLPrepare(h, (*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS)
 	if IsError(ret) {
-		defer releaseHandle(h)
+		releaseHandle(h)
 		return nil, NewError("SQLPrepare", h)
 	}
 	ps, err := ExtractParameters(h)
 	if err != nil {
-		//		defer releaseHandle(h)
-		//		return nil, err
+		releaseHandle(h)
+		return nil, err
 	}
 	return &ODBCStmt{
 		h:          h,
