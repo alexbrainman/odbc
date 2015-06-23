@@ -40,9 +40,16 @@ func (e *Error) Error() string {
 	return e.APIName + ": " + strings.Join(ss, "\n")
 }
 
-func NewError(apiName string, handle interface{}) error {
+func NewError(apiName string, handle interface{}) (err error) {
+	// catch any panics -- possible with calls the api with invalid handles
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%#v", r)
+		}
+	}()
+
 	h, ht := ToHandleAndType(handle)
-	err := &Error{APIName: apiName}
+	e := &Error{APIName: apiName}
 	var ne api.SQLINTEGER
 	state := make([]uint16, 6)
 	msg := make([]uint16, api.SQL_MAX_MESSAGE_LENGTH)
@@ -55,7 +62,7 @@ func NewError(apiName string, handle interface{}) error {
 			break
 		}
 		if IsError(ret) {
-			panic(fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret))
+			return fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret)
 		}
 		r := DiagRecord{
 			State:       api.UTF16ToString(state),
@@ -65,7 +72,7 @@ func NewError(apiName string, handle interface{}) error {
 		if r.State == "08S01" {
 			return driver.ErrBadConn
 		}
-		err.Diag = append(err.Diag, r)
+		e.Diag = append(e.Diag, r)
 	}
-	return err
+	return e
 }
