@@ -7,6 +7,7 @@ package odbc
 import (
 	"bytes"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"flag"
 	"fmt"
@@ -108,23 +109,27 @@ func (params connParams) makeODBCConnectionString() string {
 	return c
 }
 
-func mssqlConnectWithParams(params connParams) (db *sql.DB, stmtCount int, err error) {
+func mssqlConnectWithParams(params connParams) (db *sql.DB, connCount, stmtCount int, err error) {
 	db, err = sql.Open("odbc", params.makeODBCConnectionString())
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
-	return db, db.Driver().(*Driver).Stats.StmtCount, nil
+	stats := db.Driver().(*Driver).Stats
+	return db, stats.ConnCount, stats.StmtCount, nil
 }
 
-func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
+func mssqlConnect() (db *sql.DB, connCount, stmtCount int, err error) {
 	return mssqlConnectWithParams(newConnParams())
 }
 
-func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
+func closeDB(t *testing.T, db *sql.DB, maxConnCount, shouldStmtCount, ignoreIfStmtCount int) {
 	s := db.Driver().(*Driver).Stats
 	err := db.Close()
 	if err != nil {
 		t.Fatalf("error closing DB: %v", err)
+	}
+	if s.ConnCount > maxConnCount {
+		t.Errorf("unexpected ConnCount: should <= %v, is=%v", maxConnCount, s.ConnCount)
 	}
 	switch s.StmtCount {
 	case shouldStmtCount:
@@ -237,11 +242,11 @@ func exec(t *testing.T, db *sql.DB, query string) {
 }
 
 func TestMSSQLCreateInsertDelete(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	type friend struct {
 		age       int
@@ -365,11 +370,11 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 }
 
 func TestMSSQLTransactions(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+2, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (name varchar(20))")
@@ -667,11 +672,11 @@ var typeTestsToFail = []string{
 }
 
 func TestMSSQLTypes(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	tests := typeTests
 	if !isFreeTDS() {
@@ -719,11 +724,11 @@ func TestMSSQLTypes(t *testing.T) {
 // TestMSSQLIntAfterText verify that non-bindable column can
 // precede bindable column.
 func TestMSSQLIntAfterText(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	const query = "select cast('abc' as text), cast(123 as int)"
 	rows, err := db.Query(query)
@@ -752,7 +757,7 @@ func TestMSSQLIntAfterText(t *testing.T) {
 }
 
 func TestMSSQLStmtAndRows(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, _, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -835,7 +840,7 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		t.Fatalf("invalid statement count: expected %v, is %v", sc, db.Driver().(*Driver).Stats.StmtCount)
 	}
 
-	// no reource tracking past this point
+	// no resource tracking past this point
 
 	func() {
 		// test 1 Stmt and many Query's executed one after the other
@@ -931,11 +936,13 @@ func TestMSSQLIssue5(t *testing.T) {
 	defer func() {
 		testingIssue5 = false
 	}()
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+
+	const nworkers = 8
+	defer closeDB(t, db, cc+nworkers, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `
@@ -973,7 +980,6 @@ func TestMSSQLIssue5(t *testing.T) {
 		return
 	}
 
-	const nworkers = 8
 	waitch := make(chan struct{})
 	errch := make(chan error, nworkers)
 	for i := 0; i < nworkers; i++ {
@@ -999,11 +1005,11 @@ func TestMSSQLIssue5(t *testing.T) {
 }
 
 func TestMSSQLDeleteNonExistent(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (name varchar(20))")
@@ -1029,11 +1035,11 @@ func TestMSSQLDeleteNonExistent(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=14
 func TestMSSQLDatetime2Param(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	if !is2008OrLater(db) {
 		t.Skip("skipping test; needs MS SQL Server 2008 or later")
@@ -1061,11 +1067,11 @@ func TestMSSQLDatetime2Param(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=19
 func TestMSSQLMerge(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	if !is2008OrLater(db) {
 		t.Skip("skipping test; needs MS SQL Server 2008 or later")
@@ -1127,11 +1133,11 @@ func TestMSSQLMerge(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=20
 func TestMSSQLSelectInt(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	const expect = 123456
 	var got int
@@ -1145,11 +1151,11 @@ func TestMSSQLSelectInt(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=21
 func TestMSSQLTextColumnParam(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(id int primary key not null, v1 text, v2 text, v3 text, v4 text, v5 text, v6 text, v7 text, v8 text)`)
@@ -1230,11 +1236,11 @@ var paramTypeTests = []struct {
 }
 
 func TestMSSQLTextColumnParamTypes(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	for _, test := range paramTypeTests {
 		db.Exec("drop table dbo.temp")
@@ -1275,11 +1281,11 @@ func TestMSSQLTextColumnParamTypes(t *testing.T) {
 }
 
 func TestMSSQLLongColumnNames(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	query := fmt.Sprintf("select 'hello' as %s", strings.Repeat("a", 110))
 	var s string
@@ -1293,11 +1299,11 @@ func TestMSSQLLongColumnNames(t *testing.T) {
 }
 
 func TestMSSQLRawBytes(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(ascii char(7), utf16 nchar(7), blob binary(3))`)
@@ -1331,11 +1337,11 @@ func TestMSSQLUTF16ToUTF8(t *testing.T) {
 }
 
 func TestMSSQLExecStoredProcedure(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	db.Exec("drop procedure dbo.temp")
 	exec(t, db, `
@@ -1363,11 +1369,11 @@ select @ret
 }
 
 func TestMSSQLSingleCharParam(t *testing.T) {
-	db, sc, err := mssqlConnect()
+	db, cc, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(name nvarchar(50), age int)`)
@@ -1376,7 +1382,7 @@ func TestMSSQLSingleCharParam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
+	rows.Close()
 
 	exec(t, db, "drop table dbo.temp")
 }
@@ -1439,7 +1445,7 @@ func TestMSSQLReconnect(t *testing.T) {
 		for {
 			c1, err := ln.Accept()
 			if err != nil {
-				t.Fatal(err)
+				return
 			}
 			go func(c1 net.Conn) {
 				defer c1.Close()
@@ -1464,11 +1470,11 @@ func TestMSSQLReconnect(t *testing.T) {
 		}
 	}()
 
-	db, sc, err := mssqlConnectWithParams(params)
+	db, cc, sc, err := mssqlConnectWithParams(params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, sc, sc)
+	defer closeDB(t, db, cc+1, sc, sc)
 
 	testConn := func() error {
 		var n int64
@@ -1507,4 +1513,95 @@ func TestMSSQLReconnect(t *testing.T) {
 	}
 
 	exec(t, db, "drop table dbo.temp")
+}
+
+func TestMSSQLRecoverFromCommitBadConn(t *testing.T) {
+	params := newConnParams()
+	address, err := params.getConnAddress()
+	if err != nil {
+		t.Skipf("Skipping test: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	err = params.updateConnAddress(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxy := new(tcpProxy)
+
+	go func() {
+		for {
+			c1, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c1 net.Conn) {
+				defer c1.Close()
+
+				if proxy.paused() {
+					return
+				}
+
+				proxy.addConn(c1)
+
+				c2, err := net.Dial("tcp", address)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer c2.Close()
+
+				go func() {
+					io.Copy(c2, c1)
+				}()
+				io.Copy(c1, c2)
+			}(c1)
+		}
+	}()
+
+	db, cc, sc, err := mssqlConnectWithParams(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The bad connection created below should be cleared from the pool by the
+	// last call to db.Begin, so we require no net change to # of connections
+	// in the pool.
+	defer closeDB(t, db, cc, sc, sc)
+
+	// we allow one idle connection, but there should be zero if bad
+	// connections are cleared.
+	db.SetMaxIdleConns(1)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp (name varchar(50))`)
+	exec(t, db, `insert into dbo.temp (name) values ('alex')`)
+
+	var n int64
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tx.QueryRow("select count(*) from dbo.temp").Scan(&n)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// break the connection before tx.Commit
+	proxy.pause()
+	if is, should := tx.Commit(), driver.ErrBadConn; should != is {
+		t.Errorf("unexpected error return: should=%v, is=%v", should, is)
+	}
+
+	// At this point the bad connection is in the pool. Attempting to start a
+	// new transaction should fail because the connection is still broken.
+	tx, err = db.Begin()
+	if is, should := err, driver.ErrBadConn; is != should {
+		t.Errorf("unexpected error return: should=%v, is=%v", should, is)
+	}
 }

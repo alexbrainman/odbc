@@ -12,8 +12,9 @@ import (
 )
 
 type Conn struct {
-	h  api.SQLHDBC
-	tx *Tx
+	h   api.SQLHDBC
+	tx  *Tx
+	bad bool
 }
 
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
@@ -36,12 +37,31 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 	return &Conn{h: h}, nil
 }
 
-func (c *Conn) Close() error {
-	ret := api.SQLDisconnect(c.h)
-	if IsError(ret) {
-		return NewError("SQLDisconnect", c.h)
+func (c *Conn) Close() (err error) {
+	if c.tx != nil {
+		if err := c.tx.Rollback(); err != nil {
+			return err
+		}
 	}
 	h := c.h
-	c.h = api.SQLHDBC(api.SQL_NULL_HDBC)
-	return releaseHandle(h)
+	defer func() {
+		c.h = api.SQLHDBC(api.SQL_NULL_HDBC)
+		e := releaseHandle(h)
+		if err == nil {
+			err = e
+		}
+	}()
+	ret := api.SQLDisconnect(c.h)
+	if IsError(ret) {
+		return c.newError("SQLDisconnect", h)
+	}
+	return err
+}
+
+func (c *Conn) newError(apiName string, handle interface{}) error {
+	err := NewError(apiName, handle)
+	if err == driver.ErrBadConn {
+		c.bad = true
+	}
+	return err
 }

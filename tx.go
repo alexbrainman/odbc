@@ -19,12 +19,15 @@ func (c *Conn) setAutoCommitAttr(a uintptr) error {
 	ret := api.SQLSetConnectUIntPtrAttr(c.h, api.SQL_ATTR_AUTOCOMMIT,
 		a, api.SQL_IS_UINTEGER)
 	if IsError(ret) {
-		return NewError("SQLSetConnectUIntPtrAttr", c.h)
+		return c.newError("SQLSetConnectUIntPtrAttr", c.h)
 	}
 	return nil
 }
 
 func (c *Conn) Begin() (driver.Tx, error) {
+	if c.bad {
+		return nil, driver.ErrBadConn
+	}
 	if c.tx != nil {
 		return nil, errors.New("already in a transaction")
 	}
@@ -40,7 +43,6 @@ func (c *Conn) endTx(commit bool) error {
 	if c.tx == nil {
 		return errors.New("not in a transaction")
 	}
-	c.tx = nil
 	var howToEnd api.SQLSMALLINT
 	if commit {
 		howToEnd = api.SQL_COMMIT
@@ -49,8 +51,10 @@ func (c *Conn) endTx(commit bool) error {
 	}
 	ret := api.SQLEndTran(api.SQL_HANDLE_DBC, api.SQLHANDLE(c.h), howToEnd)
 	if IsError(ret) {
-		return NewError("SQLEndTran", c.h)
+		err := c.newError("SQLEndTran", c.h)
+		return err
 	}
+	c.tx = nil
 	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_ON)
 	if err != nil {
 		return err

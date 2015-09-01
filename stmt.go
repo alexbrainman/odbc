@@ -20,6 +20,9 @@ type Stmt struct {
 }
 
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
+	if c.bad {
+		return nil, driver.ErrBadConn
+	}
 	os, err := c.PrepareODBCStmt(query)
 	if err != nil {
 		return nil, err
