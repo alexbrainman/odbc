@@ -219,7 +219,7 @@ func is2008OrLater(db *sql.DB) bool {
 }
 
 func exec(t *testing.T, db *sql.DB, query string) {
-	// TODO(brainman): make sure http://code.google.com/p/go/issues/detail?id=3678 is fixed
+	// TODO(brainman): make sure https://github.com/golang/go/issues/3678 is fixed
 	//r, err := db.Exec(query, a...)
 	s, err := db.Prepare(query)
 	if err != nil {
@@ -806,7 +806,7 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		defer r.Close()
 
 		// TODO(brainman): dangling statement(s) bug reported
-		// http://code.google.com/p/go/issues/detail?id=3865
+		// https://github.com/golang/go/issues/3865
 		err = s.Close()
 		if err != nil {
 			t.Fatal(err)
@@ -1027,7 +1027,7 @@ func TestMSSQLDeleteNonExistent(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
-// https://code.google.com/p/odbc/issues/detail?id=14
+// https://github.com/alexbrainman/odbc/issues/14
 func TestMSSQLDatetime2Param(t *testing.T) {
 	db, sc, err := mssqlConnect()
 	if err != nil {
@@ -1059,7 +1059,7 @@ func TestMSSQLDatetime2Param(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
-// https://code.google.com/p/odbc/issues/detail?id=19
+// https://github.com/alexbrainman/odbc/issues/19
 func TestMSSQLMerge(t *testing.T) {
 	db, sc, err := mssqlConnect()
 	if err != nil {
@@ -1125,7 +1125,7 @@ func TestMSSQLMerge(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
-// https://code.google.com/p/odbc/issues/detail?id=20
+// https://github.com/alexbrainman/odbc/issues/20
 func TestMSSQLSelectInt(t *testing.T) {
 	db, sc, err := mssqlConnect()
 	if err != nil {
@@ -1143,7 +1143,7 @@ func TestMSSQLSelectInt(t *testing.T) {
 	}
 }
 
-// https://code.google.com/p/odbc/issues/detail?id=21
+// https://github.com/alexbrainman/odbc/issues/21
 func TestMSSQLTextColumnParam(t *testing.T) {
 	db, sc, err := mssqlConnect()
 	if err != nil {
@@ -1322,7 +1322,7 @@ func TestMSSQLRawBytes(t *testing.T) {
 	exec(t, db, "drop table dbo.temp")
 }
 
-// https://code.google.com/p/odbc/issues/detail?id=27
+// https://github.com/alexbrainman/odbc/issues/27
 func TestMSSQLUTF16ToUTF8(t *testing.T) {
 	s := []uint16{0x47, 0x75, 0x73, 0x74, 0x61, 0x66, 0x27, 0x73, 0x20, 0x4b, 0x6e, 0xe4, 0x63, 0x6b, 0x65, 0x62, 0x72, 0xf6, 0x64}
 	if api.UTF16ToString(s) != string(utf16toutf8(s)) {
