@@ -27,6 +27,9 @@ func TestFoxPro(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	if err := db.Ping(); err != nil {
+		t.Skipf("skipping test: %v", err)
+	}
 
 	type row struct {
 		char       string
