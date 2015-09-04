@@ -51,12 +51,13 @@ func (c *Conn) endTx(commit bool) error {
 	}
 	ret := api.SQLEndTran(api.SQL_HANDLE_DBC, api.SQLHANDLE(c.h), howToEnd)
 	if IsError(ret) {
-		err := c.newError("SQLEndTran", c.h)
-		return err
+		c.bad = true
+		return c.newError("SQLEndTran", c.h)
 	}
 	c.tx = nil
 	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_ON)
 	if err != nil {
+		c.bad = true
 		return err
 	}
 	return nil

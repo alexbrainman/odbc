@@ -39,9 +39,7 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 
 func (c *Conn) Close() (err error) {
 	if c.tx != nil {
-		if err := c.tx.Rollback(); err != nil {
-			return err
-		}
+		c.tx.Rollback()
 	}
 	h := c.h
 	defer func() {
