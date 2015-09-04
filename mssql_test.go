@@ -109,27 +109,24 @@ func (params connParams) makeODBCConnectionString() string {
 	return c
 }
 
-func mssqlConnectWithParams(params connParams) (db *sql.DB, connCount, stmtCount int, err error) {
+func mssqlConnectWithParams(params connParams) (db *sql.DB, stmtCount int, err error) {
 	db, err = sql.Open("odbc", params.makeODBCConnectionString())
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, err
 	}
 	stats := db.Driver().(*Driver).Stats
-	return db, stats.ConnCount, stats.StmtCount, nil
+	return db, stats.StmtCount, nil
 }
 
-func mssqlConnect() (db *sql.DB, connCount, stmtCount int, err error) {
+func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
 	return mssqlConnectWithParams(newConnParams())
 }
 
-func closeDB(t *testing.T, db *sql.DB, maxConnCount, shouldStmtCount, ignoreIfStmtCount int) {
+func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
 	s := db.Driver().(*Driver).Stats
 	err := db.Close()
 	if err != nil {
 		t.Fatalf("error closing DB: %v", err)
-	}
-	if s.ConnCount > maxConnCount {
-		t.Errorf("unexpected ConnCount: should <= %v, is=%v", maxConnCount, s.ConnCount)
 	}
 	switch s.StmtCount {
 	case shouldStmtCount:
@@ -269,11 +266,11 @@ func driverExec(t *testing.T, dc driver.Conn, query string) {
 }
 
 func TestMSSQLCreateInsertDelete(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	type friend struct {
 		age       int
@@ -397,11 +394,11 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 }
 
 func TestMSSQLTransactions(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+2, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (name varchar(20))")
@@ -699,11 +696,11 @@ var typeTestsToFail = []string{
 }
 
 func TestMSSQLTypes(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	tests := typeTests
 	if !isFreeTDS() {
@@ -751,11 +748,11 @@ func TestMSSQLTypes(t *testing.T) {
 // TestMSSQLIntAfterText verify that non-bindable column can
 // precede bindable column.
 func TestMSSQLIntAfterText(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	const query = "select cast('abc' as text), cast(123 as int)"
 	rows, err := db.Query(query)
@@ -784,7 +781,7 @@ func TestMSSQLIntAfterText(t *testing.T) {
 }
 
 func TestMSSQLStmtAndRows(t *testing.T) {
-	db, _, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -963,13 +960,13 @@ func TestMSSQLIssue5(t *testing.T) {
 	defer func() {
 		testingIssue5 = false
 	}()
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	const nworkers = 8
-	defer closeDB(t, db, cc+nworkers, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `
@@ -1032,11 +1029,11 @@ func TestMSSQLIssue5(t *testing.T) {
 }
 
 func TestMSSQLDeleteNonExistent(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, "create table dbo.temp (name varchar(20))")
@@ -1062,11 +1059,11 @@ func TestMSSQLDeleteNonExistent(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=14
 func TestMSSQLDatetime2Param(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	if !is2008OrLater(db) {
 		t.Skip("skipping test; needs MS SQL Server 2008 or later")
@@ -1094,11 +1091,11 @@ func TestMSSQLDatetime2Param(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=19
 func TestMSSQLMerge(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	if !is2008OrLater(db) {
 		t.Skip("skipping test; needs MS SQL Server 2008 or later")
@@ -1160,11 +1157,11 @@ func TestMSSQLMerge(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=20
 func TestMSSQLSelectInt(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	const expect = 123456
 	var got int
@@ -1178,11 +1175,11 @@ func TestMSSQLSelectInt(t *testing.T) {
 
 // https://code.google.com/p/odbc/issues/detail?id=21
 func TestMSSQLTextColumnParam(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(id int primary key not null, v1 text, v2 text, v3 text, v4 text, v5 text, v6 text, v7 text, v8 text)`)
@@ -1263,11 +1260,11 @@ var paramTypeTests = []struct {
 }
 
 func TestMSSQLTextColumnParamTypes(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	for _, test := range paramTypeTests {
 		db.Exec("drop table dbo.temp")
@@ -1308,11 +1305,11 @@ func TestMSSQLTextColumnParamTypes(t *testing.T) {
 }
 
 func TestMSSQLLongColumnNames(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	query := fmt.Sprintf("select 'hello' as %s", strings.Repeat("a", 110))
 	var s string
@@ -1326,11 +1323,11 @@ func TestMSSQLLongColumnNames(t *testing.T) {
 }
 
 func TestMSSQLRawBytes(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(ascii char(7), utf16 nchar(7), blob binary(3))`)
@@ -1364,11 +1361,11 @@ func TestMSSQLUTF16ToUTF8(t *testing.T) {
 }
 
 func TestMSSQLExecStoredProcedure(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop procedure dbo.temp")
 	exec(t, db, `
@@ -1396,11 +1393,11 @@ select @ret
 }
 
 func TestMSSQLSingleCharParam(t *testing.T) {
-	db, cc, sc, err := mssqlConnect()
+	db, sc, err := mssqlConnect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
 	exec(t, db, `create table dbo.temp(name nvarchar(50), age int)`)
@@ -1500,11 +1497,11 @@ func TestMSSQLReconnect(t *testing.T) {
 	proxy := new(tcpProxy)
 	go proxy.run(ln, address)
 
-	db, cc, sc, err := mssqlConnectWithParams(params)
+	db, sc, err := mssqlConnectWithParams(params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer closeDB(t, db, cc+1, sc, sc)
+	defer closeDB(t, db, sc, sc)
 
 	testConn := func() error {
 		var n int64
