@@ -31,7 +31,7 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_STMT, api.SQLHANDLE(c.h), &out)
 	if IsError(ret) {
-		return nil, NewError("SQLAllocHandle", c.h)
+		return nil, c.newError("SQLAllocHandle", c.h)
 	}
 	h := api.SQLHSTMT(out)
 	drv.Stats.updateHandleCount(api.SQL_HANDLE_STMT, 1)
@@ -40,7 +40,7 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 	ret = api.SQLPrepare(h, (*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS)
 	if IsError(ret) {
 		defer releaseHandle(h)
-		return nil, NewError("SQLPrepare", h)
+		return nil, c.newError("SQLPrepare", h)
 	}
 	ps, err := ExtractParameters(h)
 	if err != nil {
