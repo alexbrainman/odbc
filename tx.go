@@ -38,6 +38,7 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	c.tx = &Tx{c: c}
 	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_OFF)
 	if err != nil {
+		c.bad = true
 		return nil, err
 	}
 	return c.tx, nil
