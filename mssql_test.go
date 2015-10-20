@@ -1643,3 +1643,78 @@ func TestMSSQLMarkTxBadConn(t *testing.T) {
 		}
 	}
 }
+
+func TestMSSQLMarkBeginBadConn(t *testing.T) {
+	params := newConnParams()
+
+	testFn := func(label string, nextFn func(driver.Conn) error) {
+		cc, sc := drv.Stats.ConnCount, drv.Stats.StmtCount
+		defer func() {
+			if should, is := sc, drv.Stats.StmtCount; should != is {
+				t.Errorf("leaked statement, should=%d, is=%d", should, is)
+			}
+			if should, is := cc, drv.Stats.ConnCount; should != is {
+				t.Errorf("leaked connection, should=%d, is=%d", should, is)
+			}
+		}()
+
+		dc, err := drv.Open(params.makeODBCConnectionString())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := dc.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		driverExec(nil, dc, "drop table dbo.temp")
+		driverExec(t, dc, `create table dbo.temp (name varchar(50))`)
+
+		// force an error starting a transaction
+		func() {
+			testBeginErr = errors.New("cannot start tx")
+			defer func() { testBeginErr = nil }()
+
+			if _, err := dc.Begin(); err == nil {
+				t.Fatal("unexpected success, expected error")
+			}
+		}()
+
+		// database/sql might return the broken driver.Conn to the pool in
+		// that case the next operation must return driver.ErrBadConn so that
+		// the connection is not returned to the pool again.
+		if should, is := driver.ErrBadConn, nextFn(dc); should != is {
+			t.Errorf("%s: should=\"%v\", is=\"%v\"", label, should, is)
+		}
+	}
+
+	beginFn := func(dc driver.Conn) error {
+		tx, err := dc.Begin()
+		if err != nil {
+			return err
+		}
+		tx.Rollback()
+		return nil
+	}
+
+	prepareFn := func(dc driver.Conn) error {
+		st, err := dc.Prepare(`insert into dbo.temp (name) values ('alex')`)
+		if err != nil {
+			return err
+		}
+		st.Close()
+		return nil
+	}
+
+	// Test all the permutations.
+	for _, next := range []struct {
+		label string
+		fn    func(driver.Conn) error
+	}{
+		{"begin", beginFn},
+		{"prepare", prepareFn},
+	} {
+		testFn(next.label, next.fn)
+	}
+}

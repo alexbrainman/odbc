@@ -15,9 +15,13 @@ type Tx struct {
 	c *Conn
 }
 
+var testBeginErr error // used during tests
+
 func (c *Conn) setAutoCommitAttr(a uintptr) error {
-	ret := api.SQLSetConnectUIntPtrAttr(c.h, api.SQL_ATTR_AUTOCOMMIT,
-		a, api.SQL_IS_UINTEGER)
+	if testBeginErr != nil {
+		return testBeginErr
+	}
+	ret := api.SQLSetConnectUIntPtrAttr(c.h, api.SQL_ATTR_AUTOCOMMIT, a, api.SQL_IS_UINTEGER)
 	if IsError(ret) {
 		return c.newError("SQLSetConnectUIntPtrAttr", c.h)
 	}
