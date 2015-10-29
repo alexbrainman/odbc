@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/alexbrainman/odbc/api"
+	"github.com/weave-lab/odbc/api"
 )
 
 type Parameter struct {
