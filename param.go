@@ -7,6 +7,7 @@ package odbc
 import (
 	"database/sql/driver"
 	"fmt"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -155,7 +156,13 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 	var n, nullable api.SQLSMALLINT
 	ret := api.SQLNumParams(h, &n)
 	if IsError(ret) {
-		return nil, NewError("SQLNumParams", h)
+		err := NewError("SQLNumParams", h)
+
+		if strings.Contains(err.Error(), "IM001") {
+			return nil, nil
+		}
+
+		return nil, err
 	}
 	if n <= 0 {
 		// no parameters
