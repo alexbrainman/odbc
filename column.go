@@ -177,18 +177,18 @@ type BindableColumn struct {
 	Size            int
 	Len             BufferLen
 	Buffer          []byte
-	smallBuf        [8]byte // small inline memory buffer, so we do not need allocate external memory all the time
 }
+
+// TODO(brainman): BindableColumn.Buffer is used by external code after external code returns - that needs to be avoided in the future
 
 func NewBindableColumn(b *BaseColumn, ctype api.SQLSMALLINT, bufSize int) *BindableColumn {
 	b.CType = ctype
 	c := &BindableColumn{BaseColumn: b, Size: bufSize}
-	if c.Size <= len(c.smallBuf) {
-		// use inline buffer
-		c.Buffer = c.smallBuf[:c.Size]
-	} else {
-		c.Buffer = make([]byte, c.Size)
+	l := 8 // always use small starting buffer
+	if c.Size > l {
+		l = c.Size
 	}
+	c.Buffer = make([]byte, l)
 	return c
 }
 
