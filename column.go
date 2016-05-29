@@ -101,7 +101,6 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	default:
 		return nil, fmt.Errorf("unsupported column type %d", sqltype)
 	}
-	panic("unreachable")
 }
 
 // BaseColumn implements common column functionality.
