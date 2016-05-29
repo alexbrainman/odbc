@@ -13,7 +13,7 @@ type Result struct {
 }
 
 func (r *Result) LastInsertId() (int64, error) {
-	// TODO(brainman): implement (*Resilt).LastInsertId
+	// TODO(brainman): implement (*Result).LastInsertId
 	return 0, errors.New("not implemented")
 }
 
