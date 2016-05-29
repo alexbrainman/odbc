@@ -90,7 +90,7 @@ func (params connParams) getConnAddress() (string, error) {
 func (params connParams) updateConnAddress(address string) error {
 	a := strings.SplitN(address, ":", -1)
 	if len(a) != 2 {
-		fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
+		return fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
 	}
 	params["server"] = a[0]
 	params["port"] = a[1]
