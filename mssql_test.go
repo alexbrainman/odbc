@@ -368,7 +368,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 			continue
 		}
 		if is.weight != want.weight {
-			t.Errorf("I did not know, that %s weights %dkg (%dkg expected)", name, is.weight, want.weight)
+			t.Errorf("I did not know, that %s weighs %fkg (%fkg expected)", name, is.weight, want.weight)
 			continue
 		}
 		if !is.dob.Equal(want.dob) {
