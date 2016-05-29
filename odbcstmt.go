@@ -102,7 +102,9 @@ func (s *ODBCStmt) Exec(args []driver.Value) error {
 		// 2) set their (vars) values here;
 		// but rebinding parameters for every new parameter value
 		// should be efficient enough for our purpose.
-		s.Parameters[i].BindValue(s.h, i, a)
+		if err := s.Parameters[i].BindValue(s.h, i, a); err != nil {
+			return err
+		}
 	}
 	if testingIssue5 {
 		time.Sleep(10 * time.Microsecond)
