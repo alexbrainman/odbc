@@ -90,7 +90,7 @@ func (params connParams) getConnAddress() (string, error) {
 func (params connParams) updateConnAddress(address string) error {
 	a := strings.SplitN(address, ":", -1)
 	if len(a) != 2 {
-		fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
+		return fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
 	}
 	params["server"] = a[0]
 	params["port"] = a[1]
@@ -368,7 +368,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 			continue
 		}
 		if is.weight != want.weight {
-			t.Errorf("I did not know, that %s weights %dkg (%dkg expected)", name, is.weight, want.weight)
+			t.Errorf("I did not know, that %s weighs %fkg (%fkg expected)", name, is.weight, want.weight)
 			continue
 		}
 		if !is.dob.Equal(want.dob) {
