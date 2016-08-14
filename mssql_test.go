@@ -1253,6 +1253,7 @@ var paramTypeTests = []struct {
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
 	// binary blobs
 	{"small blob", "varbinary", make([]byte, 1)},
+	{"very large blob", "varbinary(max)", make([]byte, 100000)},
 	{"7999 large image", "image", make([]byte, 7999)},
 	{"8000 large image", "image", make([]byte, 8000)},
 	{"8001 large image", "image", make([]byte, 8001)},
