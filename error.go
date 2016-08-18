@@ -41,7 +41,10 @@ func (e *Error) Error() string {
 }
 
 func NewError(apiName string, handle interface{}) error {
-	h, ht := ToHandleAndType(handle)
+	h, ht, herr := ToHandleAndType(handle)
+	if herr != nil {
+		return herr
+	}
 	err := &Error{APIName: apiName}
 	var ne api.SQLINTEGER
 	state := make([]uint16, 6)
@@ -55,7 +58,7 @@ func NewError(apiName string, handle interface{}) error {
 			break
 		}
 		if IsError(ret) {
-			panic(fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret))
+			return fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret)
 		}
 		r := DiagRecord{
 			State:       api.UTF16ToString(state),
