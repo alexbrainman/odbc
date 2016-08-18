@@ -24,7 +24,7 @@ type DiagRecord struct {
 }
 
 func (r *DiagRecord) String() string {
-	return fmt.Sprintf("{%s} %s", r.State, r.Message)
+	return fmt.Sprintf("{%s} (%d) %s", r.State, r.NativeError, r.Message)
 }
 
 type Error struct {
