@@ -174,6 +174,18 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 			continue
 		}
 		p.isDescribed = true
+		// SQL Server MAX types (varchar(max), nvarchar(max),
+		// varbinary(max) are identified by size = 0
+		if p.Size == 0 {
+			switch p.SQLType {
+			case api.SQL_VARBINARY:
+				p.SQLType = api.SQL_LONGVARBINARY
+			case api.SQL_VARCHAR:
+				p.SQLType = api.SQL_LONGVARCHAR
+			case api.SQL_WVARCHAR:
+				p.SQLType = api.SQL_WLONGVARCHAR
+			}
+		}
 	}
 	return ps, nil
 }
