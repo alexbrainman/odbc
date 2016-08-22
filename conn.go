@@ -6,10 +6,13 @@ package odbc
 
 import (
 	"database/sql/driver"
+	"sync"
 	"unsafe"
 
 	"github.com/alexbrainman/odbc/api"
 )
+
+var openMutex sync.Mutex
 
 type Conn struct {
 	h   api.SQLHDBC
@@ -18,6 +21,13 @@ type Conn struct {
 }
 
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
+	// This mutex prevents intermittent unixODBC or driver library
+	// race conditions that have been experienced when two goroutines
+	// call sql.Open simultaneously with a different DSN.
+	// Encountered on CentOS 7, unixODBC 2.3.1, Microsoft ODBC Driver 13.0.0.0
+	openMutex.Lock()
+	defer openMutex.Unlock()
+
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_DBC, api.SQLHANDLE(d.h), &out)
 	if IsError(ret) {
