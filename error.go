@@ -58,7 +58,7 @@ func NewError(apiName string, handle interface{}) error {
 			break
 		}
 		if IsError(ret) {
-			return fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret)
+			return fmt.Errorf("SQLGetDiagRec failed: ret=%d (original error in: %s)", ret, apiName)
 		}
 		r := DiagRecord{
 			State:       api.UTF16ToString(state),
