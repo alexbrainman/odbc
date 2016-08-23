@@ -24,7 +24,7 @@ type DiagRecord struct {
 }
 
 func (r *DiagRecord) String() string {
-	return fmt.Sprintf("{%s} %s", r.State, r.Message)
+	return fmt.Sprintf("{%s} (%d) %s", r.State, r.NativeError, r.Message)
 }
 
 type Error struct {
@@ -58,7 +58,7 @@ func NewError(apiName string, handle interface{}) error {
 			break
 		}
 		if IsError(ret) {
-			return fmt.Errorf("SQLGetDiagRec failed: ret=%d", ret)
+			return fmt.Errorf("SQLGetDiagRec failed: ret=%d (original error in: %s)", ret, apiName)
 		}
 		r := DiagRecord{
 			State:       api.UTF16ToString(state),
