@@ -75,11 +75,23 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 			sqltype = api.SQL_WCHAR
 		}
 	case int64:
-		ctype = api.SQL_C_SBIGINT
-		p.Data = &d
-		buf = unsafe.Pointer(&d)
-		sqltype = api.SQL_BIGINT
-		size = 8
+		if -0x80000000 < d && d < 0x7fffffff {
+			// Some ODBC drivers do not support SQL_BIGINT.
+			// Use SQL_INTEGER if the value fit in int32.
+			// See issue #78 for details.
+			d2 := int32(d)
+			ctype = api.SQL_C_LONG
+			p.Data = &d2
+			buf = unsafe.Pointer(&d2)
+			sqltype = api.SQL_INTEGER
+			size = 4
+		} else {
+			ctype = api.SQL_C_SBIGINT
+			p.Data = &d
+			buf = unsafe.Pointer(&d)
+			sqltype = api.SQL_BIGINT
+			size = 8
+		}
 	case bool:
 		var b byte
 		if d {
