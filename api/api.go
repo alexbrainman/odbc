@@ -4,6 +4,10 @@
 
 package api
 
+//go:generate go run $GOROOT/src/syscall/mksyscall_windows.go -output zapi_windows.go api.go
+
+//go:generate sh -c "./mksyscall_unix.pl api.go | gofmt > zapi_unix.go"
+
 import (
 	"unicode/utf16"
 )
