@@ -1733,3 +1733,146 @@ func TestMSSQLMarkBeginBadConn(t *testing.T) {
 		testFn(next.label, next.fn)
 	}
 }
+
+func testMSSQLNextResultSet(t *testing.T, verifyBatch func(rows *sql.Rows)) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp (name varchar(50))`)
+	exec(t, db, `insert into dbo.temp (name) values ('russ')`)
+	exec(t, db, `insert into dbo.temp (name) values ('brad')`)
+
+	rows, err := db.Query(`
+select name from dbo.temp where name = 'russ';
+select name from dbo.temp where name = 'brad';
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	verifyBatch(rows)
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+func TestMSSQLNextResultSet(t *testing.T) {
+	checkName := func(rows *sql.Rows, name string) {
+		if !rows.Next() {
+			if err := rows.Err(); err != nil {
+				t.Fatalf("executing Next for %q failed: %v", name, err)
+			}
+			t.Fatalf("checking %q: at least one row expected", name)
+		}
+		var have string
+		err := rows.Scan(&have)
+		if err != nil {
+			t.Fatalf("executing Scan for %q failed: %v", name, err)
+		}
+		if name != have {
+			t.Fatalf("want %q, but %q found", name, have)
+		}
+	}
+	testMSSQLNextResultSet(t,
+		func(rows *sql.Rows) {
+			checkName(rows, "russ")
+			if !rows.NextResultSet() {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+				t.Fatal("more result sets expected")
+			}
+			checkName(rows, "brad")
+			if rows.NextResultSet() {
+				if !isFreeTDS() { // not sure why it does not work on FreeTDS
+					t.Fatal("unexpected result set found")
+				}
+			} else {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+}
+
+func TestMSSQLHasNextResultSet(t *testing.T) {
+	checkName := func(rows *sql.Rows, name string) {
+		var reccount int
+		for rows.Next() { // reading till the end of data set to trigger call into HasNextResultSet
+			var have string
+			err := rows.Scan(&have)
+			if err != nil {
+				t.Fatalf("executing Scan for %q failed: %v", name, err)
+			}
+			if name != have {
+				t.Fatalf("want %q, but %q found", name, have)
+			}
+			reccount++
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("executing Next for %q failed: %v", name, err)
+		}
+		if reccount != 1 {
+			t.Fatalf("checking %q: expected 1 row returned, but %v found", name, reccount)
+		}
+	}
+	testMSSQLNextResultSet(t,
+		func(rows *sql.Rows) {
+			checkName(rows, "russ")
+			if !rows.NextResultSet() {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+				t.Fatal("more result sets expected")
+			}
+			checkName(rows, "brad")
+			if rows.NextResultSet() {
+				t.Fatal("unexpected result set found")
+			} else {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+}
+
+func TestMSSQLIssue127(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, "create table dbo.temp (id int, a varchar(255))")
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stmt, err := tx.Prepare(`
+DECLARE @id INT, @a VARCHAR(255)
+SELECT @id = ?, @a = ?
+UPDATE dbo.temp SET a = @a WHERE id = @id
+IF @@ROWCOUNT = 0
+  INSERT INTO dbo.temp (id, a) VALUES (@id, @a)
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = stmt.Exec(1, "test"); err != nil {
+		t.Errorf("Failed to insert record with ID 1: %s", err)
+	}
+	if _, err = stmt.Exec(1, "test2"); err != nil {
+		t.Errorf("Failed to update record with ID 1: %s", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}

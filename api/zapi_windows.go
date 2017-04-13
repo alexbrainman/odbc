@@ -54,6 +54,7 @@ var (
 	procSQLGetData         = mododbc32.NewProc("SQLGetData")
 	procSQLGetDiagRecW     = mododbc32.NewProc("SQLGetDiagRecW")
 	procSQLNumParams       = mododbc32.NewProc("SQLNumParams")
+	procSQLMoreResults     = mododbc32.NewProc("SQLMoreResults")
 	procSQLNumResultCols   = mododbc32.NewProc("SQLNumResultCols")
 	procSQLPrepareW        = mododbc32.NewProc("SQLPrepareW")
 	procSQLRowCount        = mododbc32.NewProc("SQLRowCount")
@@ -147,6 +148,12 @@ func SQLGetDiagRec(handleType SQLSMALLINT, handle SQLHANDLE, recNumber SQLSMALLI
 
 func SQLNumParams(statementHandle SQLHSTMT, parameterCountPtr *SQLSMALLINT) (ret SQLRETURN) {
 	r0, _, _ := syscall.Syscall(procSQLNumParams.Addr(), 2, uintptr(statementHandle), uintptr(unsafe.Pointer(parameterCountPtr)), 0)
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLMoreResults(statementHandle SQLHSTMT) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall(procSQLMoreResults.Addr(), 1, uintptr(statementHandle), 0, 0)
 	ret = SQLRETURN(r0)
 	return
 }

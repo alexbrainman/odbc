@@ -95,6 +95,11 @@ func SQLNumParams(statementHandle SQLHSTMT, parameterCountPtr *SQLSMALLINT) (ret
 	return SQLRETURN(r)
 }
 
+func SQLMoreResults(statementHandle SQLHSTMT) (ret SQLRETURN) {
+	r := C.SQLMoreResults(C.SQLHSTMT(statementHandle))
+	return SQLRETURN(r)
+}
+
 func SQLNumResultCols(statementHandle SQLHSTMT, columnCountPtr *SQLSMALLINT) (ret SQLRETURN) {
 	r := C.SQLNumResultCols(C.SQLHSTMT(statementHandle), (*C.SQLSMALLINT)(columnCountPtr))
 	return SQLRETURN(r)
