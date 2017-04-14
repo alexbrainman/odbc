@@ -1341,6 +1341,8 @@ func TestMSSQLRawBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
+	defer rows.Close()
+
 	for rows.Next() {
 		var ascii, utf16 sql.RawBytes
 		var blob []byte
@@ -1348,6 +1350,10 @@ func TestMSSQLRawBytes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Scan: %v", err)
 		}
+	}
+	err = rows.Err()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	exec(t, db, "drop table dbo.temp")
