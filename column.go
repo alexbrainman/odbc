@@ -230,8 +230,13 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 		}
 	}
 	if c.Len.IsNull() {
-		// is NULL
-		return nil, nil
+		// Return 0 for numbers.  This is technically wrong, but NULL seems to break things.
+		switch c.CType {
+		case api.SQL_C_LONG, api.SQL_C_SBIGINT, api.SQL_C_DOUBLE:
+			return 0, nil
+		default:
+			return nil, nil
+		}
 	}
 	if !c.IsVariableWidth && int(c.Len) != c.Size {
 		panic(fmt.Errorf("wrong column #%d length %d returned, %d expected", idx, c.Len, c.Size))
