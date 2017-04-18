@@ -69,6 +69,9 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 			sqltype = api.SQL_WLONGVARCHAR
 		case p.isDescribed:
 			sqltype = p.SQLType
+			if p.SQLType == api.SQL_VARCHAR {
+				sqltype = api.SQL_WVARCHAR
+			}
 		case size <= 1:
 			sqltype = api.SQL_WVARCHAR
 		default:
