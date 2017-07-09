@@ -48,8 +48,6 @@ func describeColumn(h api.SQLHSTMT, idx int, namebuf []uint16) (namelen int, sql
 	return int(l), sqltype, size, ret
 }
 
-// TODO(brainman): did not check for MS SQL timestamp
-
 func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	namebuf := make([]uint16, 150)
 	namelen, sqltype, size, ret := describeColumn(h, idx, namebuf)
@@ -77,7 +75,7 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 		return NewBindableColumn(b, api.SQL_C_SBIGINT, 8), nil
 	case api.SQL_NUMERIC, api.SQL_DECIMAL, api.SQL_FLOAT, api.SQL_REAL, api.SQL_DOUBLE:
 		return NewBindableColumn(b, api.SQL_C_DOUBLE, 8), nil
-	case api.SQL_TYPE_TIMESTAMP:
+	case api.SQL_TYPE_TIMESTAMP, api.SQL_TYPE_TIME:
 		var v api.SQL_TIMESTAMP_STRUCT
 		return NewBindableColumn(b, api.SQL_C_TYPE_TIMESTAMP, int(unsafe.Sizeof(v))), nil
 	case api.SQL_TYPE_DATE:
