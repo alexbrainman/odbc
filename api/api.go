@@ -19,6 +19,12 @@ type (
 		Day   SQLUSMALLINT
 	}
 
+	SQL_TIME_STRUCT struct {
+		Hour   SQLUSMALLINT
+		Minute SQLUSMALLINT
+		Second SQLUSMALLINT
+	}
+
 	SQL_TIMESTAMP_STRUCT struct {
 		Year     SQLSMALLINT
 		Month    SQLUSMALLINT
