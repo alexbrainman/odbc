@@ -83,6 +83,9 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	case api.SQL_TYPE_DATE:
 		var v api.SQL_DATE_STRUCT
 		return NewBindableColumn(b, api.SQL_C_DATE, int(unsafe.Sizeof(v))), nil
+	case api.SQL_TYPE_TIME:
+		var v api.SQL_TIME_STRUCT
+		return NewBindableColumn(b, api.SQL_C_TIME, int(unsafe.Sizeof(v))), nil
 	case api.SQL_GUID:
 		var v api.SQLGUID
 		return NewBindableColumn(b, api.SQL_C_GUID, int(unsafe.Sizeof(v))), nil
@@ -157,6 +160,11 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 		t := (*api.SQL_DATE_STRUCT)(p)
 		r := time.Date(int(t.Year), time.Month(t.Month), int(t.Day),
 			0, 0, 0, 0, time.Local)
+		return r, nil
+	case api.SQL_C_TIME:
+		t := (*api.SQL_TIME_STRUCT)(p)
+		r := time.Date(1, time.January, 1,
+			int(t.Hour), int(t.Minute), int(t.Second), 0, time.Local)
 		return r, nil
 	case api.SQL_C_BINARY:
 		return buf, nil
