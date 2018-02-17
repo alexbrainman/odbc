@@ -677,6 +677,10 @@ var typeMSSQL2008Tests = []typeTest{
 	{"select cast('20151225' as datetime2)", match(time.Date(2015, 12, 25, 0, 0, 0, 0, time.Local))},
 	{"select cast('2007-05-08 12:35:29.1234567' as datetime2)", match(time.Date(2007, 5, 8, 12, 35, 29, 1234567e2, time.Local))},
 	{"select cast(NULL as datetime2)", match(nil)},
+
+	// time(7)
+	{"select cast('12:35:29' as time(7))", match(time.Date(1, 1, 1, 12, 35, 29, 0, time.Local))},
+	{"select cast(NULL as time(7))", match(nil)},
 }
 
 var typeTestsToFail = []string{

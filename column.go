@@ -83,7 +83,7 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	case api.SQL_TYPE_DATE:
 		var v api.SQL_DATE_STRUCT
 		return NewBindableColumn(b, api.SQL_C_DATE, int(unsafe.Sizeof(v))), nil
-	case api.SQL_TYPE_TIME:
+	case api.SQL_TYPE_TIME, api.SQL_SS_TIME2:
 		var v api.SQL_TIME_STRUCT
 		return NewBindableColumn(b, api.SQL_C_TIME, int(unsafe.Sizeof(v))), nil
 	case api.SQL_GUID:
