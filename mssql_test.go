@@ -172,7 +172,7 @@ func serverVersion(db *sql.DB) (sqlVersion, sqlPartNumber, osVersion string, err
 	for i := range a {
 		a[i] = strings.Trim(a[i], " \t")
 	}
-	l1 := strings.SplitN(a[0], "-", -1)
+	l1 := strings.SplitN(a[0], "- ", -1)
 	if len(l1) != 2 {
 		return "", "", "", errors.New("SQL Server version first line must have - in it: " + v)
 	}
