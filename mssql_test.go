@@ -57,6 +57,7 @@ func newConnParams() connParams {
 		params["uid"] = *msuser
 		params["pwd"] = *mspass
 		params["port"] = *msport
+		params["TDS_Version"] = "8.0"
 		//params["clientcharset"] = "UTF-8"
 		//params["debugflags"] = "0xffff"
 	} else {
