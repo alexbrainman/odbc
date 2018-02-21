@@ -41,7 +41,10 @@ func (e *Error) Error() string {
 }
 
 func NewError(apiName string, handle interface{}) error {
-	h, ht := ToHandleAndType(handle)
+	h, ht, herr := ToHandleAndType(handle)
+	if herr != nil {
+		return herr
+	}
 	err := &Error{APIName: apiName}
 	var ne api.SQLINTEGER
 	state := make([]uint16, 6)
