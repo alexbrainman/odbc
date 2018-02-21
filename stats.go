@@ -18,7 +18,7 @@ type Stats struct {
 	mu        sync.Mutex
 }
 
-func (s *Stats) updateHandleCount(handleType api.SQLSMALLINT, change int) {
+func (s *Stats) updateHandleCount(handleType api.SQLSMALLINT, change int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch handleType {
@@ -29,6 +29,7 @@ func (s *Stats) updateHandleCount(handleType api.SQLSMALLINT, change int) {
 	case api.SQL_HANDLE_STMT:
 		s.StmtCount += change
 	default:
-		panic(fmt.Errorf("unexpected handle type %d", handleType))
+		return fmt.Errorf("unexpected handle type %d", handleType)
 	}
+	return nil
 }

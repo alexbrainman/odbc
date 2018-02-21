@@ -10,7 +10,7 @@ import (
 	"github.com/alexbrainman/odbc/api"
 )
 
-func ToHandleAndType(handle interface{}) (h api.SQLHANDLE, ht api.SQLSMALLINT) {
+func ToHandleAndType(handle interface{}) (h api.SQLHANDLE, ht api.SQLSMALLINT, err error) {
 	switch v := handle.(type) {
 	case api.SQLHENV:
 		if v == api.SQLHENV(api.SQL_NULL_HANDLE) {
@@ -26,13 +26,16 @@ func ToHandleAndType(handle interface{}) (h api.SQLHANDLE, ht api.SQLSMALLINT) {
 		ht = api.SQL_HANDLE_STMT
 		h = api.SQLHANDLE(v)
 	default:
-		panic(fmt.Errorf("unexpected handle type %T", v))
+		err = fmt.Errorf("unexpected handle type %T", v)
 	}
-	return h, ht
+	return h, ht, err
 }
 
 func releaseHandle(handle interface{}) error {
-	h, ht := ToHandleAndType(handle)
+	h, ht, err := ToHandleAndType(handle)
+	if err != nil {
+		return err
+	}
 	ret := api.SQLFreeHandle(ht, h)
 	if ret == api.SQL_INVALID_HANDLE {
 		return fmt.Errorf("SQLFreeHandle(%d, %d) returns SQL_INVALID_HANDLE", ht, h)
@@ -40,6 +43,5 @@ func releaseHandle(handle interface{}) error {
 	if IsError(ret) {
 		return NewError("SQLFreeHandle", handle)
 	}
-	drv.Stats.updateHandleCount(ht, -1)
-	return nil
+	return drv.Stats.updateHandleCount(ht, -1)
 }

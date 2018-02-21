@@ -34,7 +34,10 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 		return nil, c.newError("SQLAllocHandle", c.h)
 	}
 	h := api.SQLHSTMT(out)
-	drv.Stats.updateHandleCount(api.SQL_HANDLE_STMT, 1)
+	err := drv.Stats.updateHandleCount(api.SQL_HANDLE_STMT, 1)
+	if err != nil {
+		return nil, err
+	}
 
 	b := api.StringToUTF16(query)
 	ret = api.SQLPrepare(h, (*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS)
