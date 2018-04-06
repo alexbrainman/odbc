@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 type BufferLen api.SQLLEN

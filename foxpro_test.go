@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/weave-lab/odbc"
+	_ "weavelab.xyz/odbc"
 )
 
 var (

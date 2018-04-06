@@ -9,7 +9,7 @@ package odbc
 import (
 	"database/sql"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 var drv Driver

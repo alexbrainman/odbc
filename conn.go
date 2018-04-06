@@ -8,7 +8,7 @@ import (
 	"database/sql/driver"
 	"unsafe"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 type Conn struct {

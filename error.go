@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 func IsError(ret api.SQLRETURN) bool {

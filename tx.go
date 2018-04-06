@@ -8,7 +8,7 @@ import (
 	"database/sql/driver"
 	"errors"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 type Tx struct {

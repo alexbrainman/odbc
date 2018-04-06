@@ -1,0 +1,12 @@
+cache:
+  untracked: true
+goBuild:
+  stage: build
+  image: weavelab/weavebuilder:v1.0.0
+  script:
+    - /usr/local/bin/weavebuilder
+cdTools:
+  stage: deploy
+  image: weavelab/cd-tools:v1.0.0
+  script:
+    - /bin/cd-tools

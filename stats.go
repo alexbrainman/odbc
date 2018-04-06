@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/weave-lab/odbc/api"
+	"weavelab.xyz/odbc/api"
 )
 
 type Stats struct {
