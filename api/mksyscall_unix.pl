@@ -121,8 +121,8 @@ package $package
 
 import "unsafe"
 
-// #cgo darwin LDFLAGS: -lodbc -L/opt/local/lib
-// #cgo darwin CFLAGS: -I/opt/local/include
+// #cgo darwin LDFLAGS: -lodbc -L/usr/local/lib
+// #cgo darwin CFLAGS: -I/usr/local/include
 // #cgo linux LDFLAGS: -lodbc
 // #include <sql.h>
 // #include <sqlext.h>
