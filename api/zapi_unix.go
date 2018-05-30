@@ -12,8 +12,7 @@ package api
 
 import "unsafe"
 
-// #cgo darwin LDFLAGS: -lodbc -L/opt/local/lib
-// #cgo darwin CFLAGS: -I/opt/local/include
+// #cgo darwin LDFLAGS: -lodbc
 // #cgo linux LDFLAGS: -lodbc
 // #include <sql.h>
 // #include <sqlext.h>
