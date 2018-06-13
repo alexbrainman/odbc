@@ -680,7 +680,7 @@ var typeMSSQL2008Tests = []typeTest{
 	{"select cast(NULL as datetime2)", match(nil)},
 
 	// time(7)
-	{"select cast('12:35:29' as time(7))", match(time.Date(1, 1, 1, 12, 35, 29, 0, time.Local))},
+	{"select cast('12:35:29.1234567' as time(7))", match(time.Date(1, 1, 1, 12, 35, 29, 1234567e2, time.Local))},
 	{"select cast(NULL as time(7))", match(nil)},
 }
 
@@ -715,6 +715,7 @@ func TestMSSQLTypes(t *testing.T) {
 		tests = append(tests, typeMSSQL2008Tests...)
 	}
 	for _, r := range tests {
+
 		rows, err := db.Query(r.query)
 		if err != nil {
 			t.Errorf("db.Query(%q) failed: %v", r.query, err)

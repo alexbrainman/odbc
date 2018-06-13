@@ -66,7 +66,8 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 		return nil, errors.New("Failed to allocate column name buffer")
 	}
 	b := &BaseColumn{
-		name: api.UTF16ToString(namebuf[:namelen]),
+		name:    api.UTF16ToString(namebuf[:namelen]),
+		SQLType: sqltype,
 	}
 	switch sqltype {
 	case api.SQL_BIT:
@@ -83,9 +84,12 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	case api.SQL_TYPE_DATE:
 		var v api.SQL_DATE_STRUCT
 		return NewBindableColumn(b, api.SQL_C_DATE, int(unsafe.Sizeof(v))), nil
-	case api.SQL_TYPE_TIME, api.SQL_SS_TIME2:
+	case api.SQL_TYPE_TIME:
 		var v api.SQL_TIME_STRUCT
 		return NewBindableColumn(b, api.SQL_C_TIME, int(unsafe.Sizeof(v))), nil
+	case api.SQL_SS_TIME2:
+		var v api.SQL_SS_TIME2_STRUCT
+		return NewBindableColumn(b, api.SQL_C_BINARY, int(unsafe.Sizeof(v))), nil
 	case api.SQL_GUID:
 		var v api.SQLGUID
 		return NewBindableColumn(b, api.SQL_C_GUID, int(unsafe.Sizeof(v))), nil
@@ -108,8 +112,9 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 
 // BaseColumn implements common column functionality.
 type BaseColumn struct {
-	name  string
-	CType api.SQLSMALLINT
+	name    string
+	SQLType api.SQLSMALLINT
+	CType   api.SQLSMALLINT
 }
 
 func (c *BaseColumn) Name() string {
@@ -167,6 +172,13 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 			int(t.Hour), int(t.Minute), int(t.Second), 0, time.Local)
 		return r, nil
 	case api.SQL_C_BINARY:
+		if c.SQLType == api.SQL_SS_TIME2 {
+			t := (*api.SQL_SS_TIME2_STRUCT)(p)
+			r := time.Date(1, time.January, 1,
+				int(t.Hour), int(t.Minute), int(t.Second), int(t.Fraction),
+				time.Local)
+			return r, nil
+		}
 		return buf, nil
 	}
 	return nil, fmt.Errorf("unsupported column ctype %d", c.CType)

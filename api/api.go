@@ -25,6 +25,13 @@ type (
 		Second SQLUSMALLINT
 	}
 
+	SQL_SS_TIME2_STRUCT struct {
+		Hour     SQLUSMALLINT
+		Minute   SQLUSMALLINT
+		Second   SQLUSMALLINT
+		Fraction SQLUINTEGER
+	}
+
 	SQL_TIMESTAMP_STRUCT struct {
 		Year     SQLSMALLINT
 		Month    SQLUSMALLINT
