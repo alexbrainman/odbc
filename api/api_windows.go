@@ -108,6 +108,9 @@ const (
 	SQL_CP_DEFAULT              = SQL_CP_OFF
 	SQL_CP_STRICT_MATCH         = 0
 	SQL_CP_RELAXED_MATCH        = uintptr(1)
+
+	SQL_FETCH_NEXT = 1
+	SQL_MAX_DSN_LENGTH  = 32
 )
 
 type (

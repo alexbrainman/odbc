@@ -43,6 +43,7 @@ var (
 	procSQLBindCol         = mododbc32.NewProc("SQLBindCol")
 	procSQLBindParameter   = mododbc32.NewProc("SQLBindParameter")
 	procSQLCloseCursor     = mododbc32.NewProc("SQLCloseCursor")
+	procSQLDataSources     = mododbc32.NewProc("SQLDataSources")
 	procSQLDescribeColW    = mododbc32.NewProc("SQLDescribeColW")
 	procSQLDescribeParam   = mododbc32.NewProc("SQLDescribeParam")
 	procSQLDisconnect      = mododbc32.NewProc("SQLDisconnect")
@@ -87,6 +88,16 @@ func SQLCloseCursor(statementHandle SQLHSTMT) (ret SQLRETURN) {
 
 func SQLDescribeCol(statementHandle SQLHSTMT, columnNumber SQLUSMALLINT, columnName *SQLWCHAR, bufferLength SQLSMALLINT, nameLengthPtr *SQLSMALLINT, dataTypePtr *SQLSMALLINT, columnSizePtr *SQLULEN, decimalDigitsPtr *SQLSMALLINT, nullablePtr *SQLSMALLINT) (ret SQLRETURN) {
 	r0, _, _ := syscall.Syscall9(procSQLDescribeColW.Addr(), 9, uintptr(statementHandle), uintptr(columnNumber), uintptr(unsafe.Pointer(columnName)), uintptr(bufferLength), uintptr(unsafe.Pointer(nameLengthPtr)), uintptr(unsafe.Pointer(dataTypePtr)), uintptr(unsafe.Pointer(columnSizePtr)), uintptr(unsafe.Pointer(decimalDigitsPtr)), uintptr(unsafe.Pointer(nullablePtr)))
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLDataSources (envHandle SQLHENV, direction SQLUSMALLINT,
+	dsnName *SQLSCHAR, dsnBufferLength SQLSMALLINT, dsnNameLengthPtr *SQLSMALLINT,
+	dsnDescription *SQLSCHAR, dsnDescriptionBufferLength SQLSMALLINT, dsnDescriptionNameLengthPtr *SQLSMALLINT) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall9(procSQLDataSources.Addr(), 8, uintptr(envHandle), uintptr(direction),
+		uintptr(unsafe.Pointer(dsnName)), uintptr(dsnBufferLength), uintptr(unsafe.Pointer(dsnNameLengthPtr)),
+		uintptr(unsafe.Pointer(dsnDescription)), uintptr(dsnDescriptionBufferLength), uintptr(unsafe.Pointer(dsnDescriptionNameLengthPtr)), 0)
 	ret = SQLRETURN(r0)
 	return
 }
