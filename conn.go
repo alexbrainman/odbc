@@ -8,7 +8,7 @@ import (
 	"database/sql/driver"
 	"unsafe"
 
-	"github.com/alexbrainman/odbc/api"
+	"github.com/mpcjanssen/odbc/api"
 )
 
 type Conn struct {
