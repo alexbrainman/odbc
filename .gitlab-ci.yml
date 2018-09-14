@@ -2,7 +2,7 @@ cache:
   untracked: true
 goBuild:
   stage: build
-  image: weavelab/weavebuilder:v1.0.0
+  image: weavelab/weavebuilder:$WEAVE_BUILDER_VERSION
   script:
     - /usr/local/bin/weavebuilder
 cdTools:
