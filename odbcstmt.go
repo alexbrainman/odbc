@@ -95,7 +95,7 @@ func (s *ODBCStmt) releaseHandle() error {
 
 var testingIssue5 bool // used during tests
 
-func (s *ODBCStmt) Exec(args []driver.Value) error {
+func (s *ODBCStmt) Exec(args []driver.Value, conn *Conn) error {
 	if len(args) != len(s.Parameters) {
 		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.Parameters))
 	}
@@ -105,7 +105,7 @@ func (s *ODBCStmt) Exec(args []driver.Value) error {
 		// 2) set their (vars) values here;
 		// but rebinding parameters for every new parameter value
 		// should be efficient enough for our purpose.
-		if err := s.Parameters[i].BindValue(s.h, i, a); err != nil {
+		if err := s.Parameters[i].BindValue(s.h, i, a, conn); err != nil {
 			return err
 		}
 	}

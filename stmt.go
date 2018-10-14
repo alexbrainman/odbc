@@ -61,7 +61,7 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		s.os = os
 	}
-	err := s.os.Exec(args)
+	err := s.os.Exec(args, s.c)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 		s.os = os
 	}
-	err := s.os.Exec(args)
+	err := s.os.Exec(args, s.c)
 	if err != nil {
 		return nil, err
 	}
