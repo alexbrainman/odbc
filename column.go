@@ -17,7 +17,7 @@ import (
 type BufferLen api.SQLLEN
 
 func (l *BufferLen) IsNull() bool {
-	return *l == api.SQL_NULL_DATA
+	return int16(*l) == api.SQL_NULL_DATA
 }
 
 func (l *BufferLen) GetData(h api.SQLHSTMT, idx int, ctype api.SQLSMALLINT, buf []byte) api.SQLRETURN {
@@ -249,7 +249,7 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 			return nil, NewError("SQLGetData", h)
 		}
 	}
-	if c.Len.IsNull() || (int(c.Len) > c.Size) {
+	if c.Len.IsNull() {
 		// is NULL
 		return nil, nil
 	}
