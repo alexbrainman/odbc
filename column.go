@@ -249,7 +249,7 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 			return nil, NewError("SQLGetData", h)
 		}
 	}
-	if c.Len.IsNull() {
+	if c.Len.IsNull() || (int(c.Len) > c.Size) {
 		// is NULL
 		return nil, nil
 	}
