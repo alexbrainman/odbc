@@ -1799,6 +1799,47 @@ func TestMSSQLNextResultSet(t *testing.T) {
 		})
 }
 
+func TestMSSQLNextResultSetWithDifferentColumnsInResultSets(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+	rows, err := db.Query("select 1 select 2,3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		t.Fatal("expected at least 1 result")
+	}
+	var v1, v2 int
+	err = rows.Scan(&v1)
+	if err != nil {
+		t.Fatalf("unable to scan select 1 underlying error: %v", err)
+	}
+	if v1 != 1 {
+		t.Fatalf("expected: %v got %v", 1, v1)
+	}
+	if rows.Next() {
+		t.Fatal("unexpected row")
+	}
+	if !rows.NextResultSet() {
+		t.Fatal("expected another result set")
+	}
+	if !rows.Next() {
+		t.Fatal("expected a single row")
+	}
+	err = rows.Scan(&v1, &v2)
+	if err != nil {
+		t.Fatalf("unable to scan select 2,3 underlying error: %v", err)
+	}
+	if v1 != 2 || v2 != 3 {
+		t.Fatalf("got wrong values expected v1=%v v2=%v. got v1=%v v2=%v", 2, 3, v1, v2)
+	}
+
+}
+
 func TestMSSQLHasNextResultSet(t *testing.T) {
 	checkName := func(rows *sql.Rows, name string) {
 		var reccount int
