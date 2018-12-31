@@ -1742,7 +1742,7 @@ func testMSSQLNextResultSet(t *testing.T, verifyBatch func(rows *sql.Rows)) {
 	defer closeDB(t, db, sc, sc)
 
 	db.Exec("drop table dbo.temp")
-	exec(t, db, `create table dbo.temp (name varchar(50), notaname int)`)
+	exec(t, db, `create table dbo.temp (name varchar(50))`)
 	exec(t, db, `insert into dbo.temp (name) values ('russ')`)
 	exec(t, db, `insert into dbo.temp (name) values ('brad')`)
 
@@ -1809,13 +1809,14 @@ func TestMSSQLNextResultSetWithDifferentColumnsInResultSets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer rows.Close()
 	if !rows.Next() {
 		t.Fatal("expected at least 1 result")
 	}
 	var v1, v2 int
 	err = rows.Scan(&v1)
 	if err != nil {
-		t.Fatalf("unable to scan select 1 underlying error: %+v", err)
+		t.Fatalf("unable to scan select 1 underlying error: %v", err)
 	}
 	if v1 != 1 {
 		t.Fatalf("expected: %v got %v", 1, v1)
@@ -1831,12 +1832,12 @@ func TestMSSQLNextResultSetWithDifferentColumnsInResultSets(t *testing.T) {
 	}
 	err = rows.Scan(&v1, &v2)
 	if err != nil {
-		t.Fatalf("unable to scan select 2,3 underlying error: %+v", err)
+		t.Fatalf("unable to scan select 2,3 underlying error: %v", err)
 	}
 	if v1 != 2 || v2 != 3 {
-		t.Fatalf("got wrong values expected v1: %v v2: %v. got v1: %v v2: %v. ", 2, 3, v1, v2)
+		t.Fatalf("got wrong values expected v1=%v v2=%v. got v1=%v v2=%v", 2, 3, v1, v2)
 	}
-	rows.Close()
+
 }
 
 func TestMSSQLHasNextResultSet(t *testing.T) {
