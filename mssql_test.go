@@ -1787,14 +1787,14 @@ func TestMSSQLNextResultSet(t *testing.T) {
 				t.Fatal("more result sets expected")
 			}
 			checkName(rows, "brad")
+			if isFreeTDS() { // not sure why it does not work on FreeTDS
+				t.Log("skipping broken part of the test on FreeTDS")
+				return
+			}
 			if rows.NextResultSet() {
-				if !isFreeTDS() { // not sure why it does not work on FreeTDS
-					t.Fatal("unexpected result set found")
-				}
-			} else {
-				if err := rows.Err(); err != nil {
-					t.Fatal(err)
-				}
+				t.Fatal("unexpected result set found")
+			} else if err := rows.Err(); err != nil {
+				t.Fatal(err)
 			}
 		})
 }
