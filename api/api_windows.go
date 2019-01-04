@@ -68,6 +68,7 @@ const (
 	SQL_SIGNED_OFFSET   = -20
 	SQL_UNSIGNED_OFFSET = -22
 	SQL_SS_XML          = -152
+	SQL_SS_TIME2        = -154
 
 	SQL_C_CHAR           = SQL_CHAR
 	SQL_C_LONG           = SQL_INTEGER

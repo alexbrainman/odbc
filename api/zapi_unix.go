@@ -5,16 +5,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin linux
+// +build darwin linux freebsd
 // +build cgo
 
 package api
 
 import "unsafe"
 
-// #cgo darwin LDFLAGS: -lodbc -L/opt/local/lib
-// #cgo darwin CFLAGS: -I/opt/local/include
+// #cgo darwin LDFLAGS: -lodbc
 // #cgo linux LDFLAGS: -lodbc
+// #cgo freebsd LDFLAGS: -L /usr/local/lib -lodbc
+// #cgo freebsd CFLAGS: -I/usr/local/include
 // #include <sql.h>
 // #include <sqlext.h>
 import "C"
@@ -91,6 +92,11 @@ func SQLGetDiagRec(handleType SQLSMALLINT, handle SQLHANDLE, recNumber SQLSMALLI
 
 func SQLNumParams(statementHandle SQLHSTMT, parameterCountPtr *SQLSMALLINT) (ret SQLRETURN) {
 	r := C.SQLNumParams(C.SQLHSTMT(statementHandle), (*C.SQLSMALLINT)(parameterCountPtr))
+	return SQLRETURN(r)
+}
+
+func SQLMoreResults(statementHandle SQLHSTMT) (ret SQLRETURN) {
+	r := C.SQLMoreResults(C.SQLHSTMT(statementHandle))
 	return SQLRETURN(r)
 }
 

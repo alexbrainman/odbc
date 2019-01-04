@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"unsafe"
-
 	"weavelab.xyz/odbc/api"
 )
 
@@ -40,16 +39,12 @@ func (e *Error) Error() string {
 	return e.APIName + ": " + strings.Join(ss, "\n")
 }
 
-func NewError(apiName string, handle interface{}) (err error) {
-	// catch any panics -- possible with calls the api with invalid handles
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%#v", r)
-		}
-	}()
-
-	h, ht := ToHandleAndType(handle)
-	e := &Error{APIName: apiName}
+func NewError(apiName string, handle interface{}) error {
+	h, ht, herr := ToHandleAndType(handle)
+	if herr != nil {
+		return herr
+	}
+	err := &Error{APIName: apiName}
 	var ne api.SQLINTEGER
 	state := make([]uint16, 6)
 	msg := make([]uint16, api.SQL_MAX_MESSAGE_LENGTH)
@@ -72,7 +67,7 @@ func NewError(apiName string, handle interface{}) (err error) {
 		if r.State == "08S01" {
 			return driver.ErrBadConn
 		}
-		e.Diag = append(e.Diag, r)
+		err.Diag = append(err.Diag, r)
 	}
-	return e
+	return err
 }

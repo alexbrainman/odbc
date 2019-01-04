@@ -57,6 +57,7 @@ func newConnParams() connParams {
 		params["uid"] = *msuser
 		params["pwd"] = *mspass
 		params["port"] = *msport
+		params["TDS_Version"] = "8.0"
 		//params["clientcharset"] = "UTF-8"
 		//params["debugflags"] = "0xffff"
 	} else {
@@ -90,7 +91,7 @@ func (params connParams) getConnAddress() (string, error) {
 func (params connParams) updateConnAddress(address string) error {
 	a := strings.SplitN(address, ":", -1)
 	if len(a) != 2 {
-		fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
+		return fmt.Errorf("listen address must have 2 fields, but %d found", len(a))
 	}
 	params["server"] = a[0]
 	params["port"] = a[1]
@@ -172,7 +173,7 @@ func serverVersion(db *sql.DB) (sqlVersion, sqlPartNumber, osVersion string, err
 	for i := range a {
 		a[i] = strings.Trim(a[i], " \t")
 	}
-	l1 := strings.SplitN(a[0], "-", -1)
+	l1 := strings.SplitN(a[0], "- ", -1)
 	if len(l1) != 2 {
 		return "", "", "", errors.New("SQL Server version first line must have - in it: " + v)
 	}
@@ -368,7 +369,7 @@ func TestMSSQLCreateInsertDelete(t *testing.T) {
 			continue
 		}
 		if is.weight != want.weight {
-			t.Errorf("I did not know, that %s weights %dkg (%dkg expected)", name, is.weight, want.weight)
+			t.Errorf("I did not know, that %s weighs %fkg (%fkg expected)", name, is.weight, want.weight)
 			continue
 		}
 		if !is.dob.Equal(want.dob) {
@@ -677,6 +678,10 @@ var typeMSSQL2008Tests = []typeTest{
 	{"select cast('20151225' as datetime2)", match(time.Date(2015, 12, 25, 0, 0, 0, 0, time.Local))},
 	{"select cast('2007-05-08 12:35:29.1234567' as datetime2)", match(time.Date(2007, 5, 8, 12, 35, 29, 1234567e2, time.Local))},
 	{"select cast(NULL as datetime2)", match(nil)},
+
+	// time(7)
+	{"select cast('12:35:29.1234567' as time(7))", match(time.Date(1, 1, 1, 12, 35, 29, 1234567e2, time.Local))},
+	{"select cast(NULL as time(7))", match(nil)},
 }
 
 var typeTestsToFail = []string{
@@ -710,29 +715,31 @@ func TestMSSQLTypes(t *testing.T) {
 		tests = append(tests, typeMSSQL2008Tests...)
 	}
 	for _, r := range tests {
-		rows, err := db.Query(r.query)
-		if err != nil {
-			t.Errorf("db.Query(%q) failed: %v", r.query, err)
-			continue
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var got interface{}
-			err := rows.Scan(&got)
+		func() {
+			rows, err := db.Query(r.query)
 			if err != nil {
-				t.Errorf("rows.Scan for %q failed: %v", r.query, err)
-				continue
+				t.Errorf("db.Query(%q) failed: %v", r.query, err)
+				return
 			}
-			err = r.match(got)
+			defer rows.Close()
+			for rows.Next() {
+				var got interface{}
+				err := rows.Scan(&got)
+				if err != nil {
+					t.Errorf("rows.Scan for %q failed: %v", r.query, err)
+					return
+				}
+				err = r.match(got)
+				if err != nil {
+					t.Errorf("test %q failed: %v", r.query, err)
+				}
+			}
+			err = rows.Err()
 			if err != nil {
-				t.Errorf("test %q failed: %v", r.query, err)
+				t.Error(err)
+				return
 			}
-		}
-		err = rows.Err()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+		}()
 	}
 
 	for _, query := range typeTestsToFail {
@@ -1253,6 +1260,7 @@ var paramTypeTests = []struct {
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
 	// binary blobs
 	{"small blob", "varbinary", make([]byte, 1)},
+	{"very large blob", "varbinary(max)", make([]byte, 100000)},
 	{"7999 large image", "image", make([]byte, 7999)},
 	{"8000 large image", "image", make([]byte, 8000)},
 	{"8001 large image", "image", make([]byte, 8001)},
@@ -1340,6 +1348,8 @@ func TestMSSQLRawBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
+	defer rows.Close()
+
 	for rows.Next() {
 		var ascii, utf16 sql.RawBytes
 		var blob []byte
@@ -1347,6 +1357,10 @@ func TestMSSQLRawBytes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Scan: %v", err)
 		}
+	}
+	err = rows.Err()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	exec(t, db, "drop table dbo.temp")
@@ -1717,5 +1731,189 @@ func TestMSSQLMarkBeginBadConn(t *testing.T) {
 		{"prepare", prepareFn},
 	} {
 		testFn(next.label, next.fn)
+	}
+}
+
+func testMSSQLNextResultSet(t *testing.T, verifyBatch func(rows *sql.Rows)) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, `create table dbo.temp (name varchar(50))`)
+	exec(t, db, `insert into dbo.temp (name) values ('russ')`)
+	exec(t, db, `insert into dbo.temp (name) values ('brad')`)
+
+	rows, err := db.Query(`
+select name from dbo.temp where name = 'russ';
+select name from dbo.temp where name = 'brad';
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	verifyBatch(rows)
+
+	exec(t, db, "drop table dbo.temp")
+}
+
+func TestMSSQLNextResultSet(t *testing.T) {
+	checkName := func(rows *sql.Rows, name string) {
+		if !rows.Next() {
+			if err := rows.Err(); err != nil {
+				t.Fatalf("executing Next for %q failed: %v", name, err)
+			}
+			t.Fatalf("checking %q: at least one row expected", name)
+		}
+		var have string
+		err := rows.Scan(&have)
+		if err != nil {
+			t.Fatalf("executing Scan for %q failed: %v", name, err)
+		}
+		if name != have {
+			t.Fatalf("want %q, but %q found", name, have)
+		}
+	}
+	testMSSQLNextResultSet(t,
+		func(rows *sql.Rows) {
+			checkName(rows, "russ")
+			if !rows.NextResultSet() {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+				t.Fatal("more result sets expected")
+			}
+			checkName(rows, "brad")
+			if isFreeTDS() { // not sure why it does not work on FreeTDS
+				t.Log("skipping broken part of the test on FreeTDS")
+				return
+			}
+			if rows.NextResultSet() {
+				t.Fatal("unexpected result set found")
+			} else if err := rows.Err(); err != nil {
+				t.Fatal(err)
+			}
+		})
+}
+
+func TestMSSQLNextResultSetWithDifferentColumnsInResultSets(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+	rows, err := db.Query("select 1 select 2,3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		t.Fatal("expected at least 1 result")
+	}
+	var v1, v2 int
+	err = rows.Scan(&v1)
+	if err != nil {
+		t.Fatalf("unable to scan select 1 underlying error: %v", err)
+	}
+	if v1 != 1 {
+		t.Fatalf("expected: %v got %v", 1, v1)
+	}
+	if rows.Next() {
+		t.Fatal("unexpected row")
+	}
+	if !rows.NextResultSet() {
+		t.Fatal("expected another result set")
+	}
+	if !rows.Next() {
+		t.Fatal("expected a single row")
+	}
+	err = rows.Scan(&v1, &v2)
+	if err != nil {
+		t.Fatalf("unable to scan select 2,3 underlying error: %v", err)
+	}
+	if v1 != 2 || v2 != 3 {
+		t.Fatalf("got wrong values expected v1=%v v2=%v. got v1=%v v2=%v", 2, 3, v1, v2)
+	}
+
+}
+
+func TestMSSQLHasNextResultSet(t *testing.T) {
+	checkName := func(rows *sql.Rows, name string) {
+		var reccount int
+		for rows.Next() { // reading till the end of data set to trigger call into HasNextResultSet
+			var have string
+			err := rows.Scan(&have)
+			if err != nil {
+				t.Fatalf("executing Scan for %q failed: %v", name, err)
+			}
+			if name != have {
+				t.Fatalf("want %q, but %q found", name, have)
+			}
+			reccount++
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("executing Next for %q failed: %v", name, err)
+		}
+		if reccount != 1 {
+			t.Fatalf("checking %q: expected 1 row returned, but %v found", name, reccount)
+		}
+	}
+	testMSSQLNextResultSet(t,
+		func(rows *sql.Rows) {
+			checkName(rows, "russ")
+			if !rows.NextResultSet() {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+				t.Fatal("more result sets expected")
+			}
+			checkName(rows, "brad")
+			if rows.NextResultSet() {
+				t.Fatal("unexpected result set found")
+			} else {
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+}
+
+func TestMSSQLIssue127(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	db.Exec("drop table dbo.temp")
+	exec(t, db, "create table dbo.temp (id int, a varchar(255))")
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stmt, err := tx.Prepare(`
+DECLARE @id INT, @a VARCHAR(255)
+SELECT @id = ?, @a = ?
+UPDATE dbo.temp SET a = @a WHERE id = @id
+IF @@ROWCOUNT = 0
+  INSERT INTO dbo.temp (id, a) VALUES (@id, @a)
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = stmt.Exec(1, "test"); err != nil {
+		t.Errorf("Failed to insert record with ID 1: %s", err)
+	}
+	if _, err = stmt.Exec(1, "test2"); err != nil {
+		t.Errorf("Failed to update record with ID 1: %s", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 }

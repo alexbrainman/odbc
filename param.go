@@ -33,7 +33,7 @@ func (p *Parameter) StoreStrLen_or_IndPtr(v api.SQLLEN) *api.SQLLEN {
 
 }
 
-func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
+func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Conn) error {
 	// TODO(brainman): Reuse memory for previously bound values. If memory
 	// is reused, we, probably, do not need to call SQLBindParameter either.
 	var ctype, sqltype, decimal api.SQLSMALLINT
@@ -65,22 +65,40 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 		l *= 2 // every char takes 2 bytes
 		buflen = api.SQLLEN(l)
 		plen = p.StoreStrLen_or_IndPtr(buflen)
-		switch {
-		case size >= 4000:
+		if !conn.isMSAccessDriver {
+			switch {
+			case size >= 4000:
+				sqltype = api.SQL_WLONGVARCHAR
+			case p.isDescribed:
+				sqltype = p.SQLType
+			case size <= 1:
+				sqltype = api.SQL_WVARCHAR
+			default:
+				sqltype = api.SQL_WCHAR
+			}
+		} else {
+			// MS Acess requires SQL_WLONGVARCHAR for MEMO.
+			// https://docs.microsoft.com/en-us/sql/odbc/microsoft/microsoft-access-data-types
 			sqltype = api.SQL_WLONGVARCHAR
-		case p.isDescribed:
-			sqltype = p.SQLType
-		case size <= 1:
-			sqltype = api.SQL_WVARCHAR
-		default:
-			sqltype = api.SQL_WCHAR
 		}
 	case int64:
-		ctype = api.SQL_C_SBIGINT
-		p.Data = &d
-		buf = unsafe.Pointer(&d)
-		sqltype = api.SQL_BIGINT
-		size = 8
+		if -0x80000000 < d && d < 0x7fffffff {
+			// Some ODBC drivers do not support SQL_BIGINT.
+			// Use SQL_INTEGER if the value fit in int32.
+			// See issue #78 for details.
+			d2 := int32(d)
+			ctype = api.SQL_C_LONG
+			p.Data = &d2
+			buf = unsafe.Pointer(&d2)
+			sqltype = api.SQL_INTEGER
+			size = 4
+		} else {
+			ctype = api.SQL_C_SBIGINT
+			p.Data = &d
+			buf = unsafe.Pointer(&d)
+			sqltype = api.SQL_BIGINT
+			size = 8
+		}
 	case bool:
 		var b byte
 		if d {
@@ -140,7 +158,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value) error {
 			sqltype = api.SQL_BINARY
 		}
 	default:
-		panic(fmt.Errorf("unsupported type %T", v))
+		return fmt.Errorf("unsupported type %T", v)
 	}
 	ret := api.SQLBindParameter(h, api.SQLUSMALLINT(idx+1),
 		api.SQL_PARAM_INPUT, ctype, sqltype, size, decimal,
@@ -181,6 +199,18 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 			continue
 		}
 		p.isDescribed = true
+		// SQL Server MAX types (varchar(max), nvarchar(max),
+		// varbinary(max) are identified by size = 0
+		if p.Size == 0 {
+			switch p.SQLType {
+			case api.SQL_VARBINARY:
+				p.SQLType = api.SQL_LONGVARBINARY
+			case api.SQL_VARCHAR:
+				p.SQLType = api.SQL_LONGVARCHAR
+			case api.SQL_WVARCHAR:
+				p.SQLType = api.SQL_WLONGVARCHAR
+			}
+		}
 	}
 	return ps, nil
 }

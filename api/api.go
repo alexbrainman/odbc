@@ -4,6 +4,10 @@
 
 package api
 
+//go:generate go run $GOROOT/src/syscall/mksyscall_windows.go -output zapi_windows.go api.go
+
+//go:generate sh -c "./mksyscall_unix.pl api.go | gofmt > zapi_unix.go"
+
 import (
 	"unicode/utf16"
 )
@@ -13,6 +17,19 @@ type (
 		Year  SQLSMALLINT
 		Month SQLUSMALLINT
 		Day   SQLUSMALLINT
+	}
+
+	SQL_TIME_STRUCT struct {
+		Hour   SQLUSMALLINT
+		Minute SQLUSMALLINT
+		Second SQLUSMALLINT
+	}
+
+	SQL_SS_TIME2_STRUCT struct {
+		Hour     SQLUSMALLINT
+		Minute   SQLUSMALLINT
+		Second   SQLUSMALLINT
+		Fraction SQLUINTEGER
 	}
 
 	SQL_TIMESTAMP_STRUCT struct {
@@ -41,6 +58,7 @@ type (
 //sys	SQLGetData(statementHandle SQLHSTMT, colOrParamNum SQLUSMALLINT, targetType SQLSMALLINT, targetValuePtr SQLPOINTER, bufferLength SQLLEN, vallen *SQLLEN) (ret SQLRETURN) = odbc32.SQLGetData
 //sys	SQLGetDiagRec(handleType SQLSMALLINT, handle SQLHANDLE, recNumber SQLSMALLINT, sqlState *SQLWCHAR, nativeErrorPtr *SQLINTEGER, messageText *SQLWCHAR, bufferLength SQLSMALLINT, textLengthPtr *SQLSMALLINT) (ret SQLRETURN) = odbc32.SQLGetDiagRecW
 //sys	SQLNumParams(statementHandle SQLHSTMT, parameterCountPtr *SQLSMALLINT) (ret SQLRETURN) = odbc32.SQLNumParams
+//sys	SQLMoreResults(statementHandle SQLHSTMT) (ret SQLRETURN) = odbc32.SQLMoreResults
 //sys	SQLNumResultCols(statementHandle SQLHSTMT, columnCountPtr *SQLSMALLINT)  (ret SQLRETURN) = odbc32.SQLNumResultCols
 //sys	SQLPrepare(statementHandle SQLHSTMT, statementText *SQLWCHAR, textLength SQLINTEGER) (ret SQLRETURN) = odbc32.SQLPrepareW
 //sys	SQLRowCount(statementHandle SQLHSTMT, rowCountPtr *SQLLEN) (ret SQLRETURN) = odbc32.SQLRowCount
