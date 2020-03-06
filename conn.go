@@ -22,6 +22,10 @@ type Conn struct {
 var accessDriverSubstr = strings.ToUpper(strings.Replace("DRIVER={Microsoft Access Driver", " ", "", -1))
 
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
+	if d.initErr != nil {
+		return nil, d.initErr
+	}
+
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_DBC, api.SQLHANDLE(d.h), &out)
 	if IsError(ret) {

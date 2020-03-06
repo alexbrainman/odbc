@@ -16,7 +16,8 @@ var drv Driver
 
 type Driver struct {
 	Stats
-	h api.SQLHENV // environment handle
+	h       api.SQLHENV // environment handle
+	initErr error
 }
 
 func initDriver() error {
@@ -72,7 +73,7 @@ func (d *Driver) Close() error {
 func init() {
 	err := initDriver()
 	if err != nil {
-		panic(err)
+		drv.initErr = err
 	}
 	sql.Register("odbc", &drv)
 }
