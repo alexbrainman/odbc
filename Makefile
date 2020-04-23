@@ -19,6 +19,9 @@ start-mssql:
 test-mssql:
 	go test -v -mssrv=localhost -msdb=$(DB_NAME) -msuser=sa -mspass=$(MSSQL_SA_PASSWORD) -run=TestMSSQL
 
+test-mssql-race:
+	go test -v -mssrv=localhost -msdb=$(DB_NAME) -msuser=sa -mspass=$(MSSQL_SA_PASSWORD) -run=TestMSSQL --race
+
 stop-mssql:
 	docker stop $(MSSQL_CONTAINER_NAME)
 	docker rm $(MSSQL_CONTAINER_NAME)

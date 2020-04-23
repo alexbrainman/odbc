@@ -141,7 +141,7 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 		if p == nil {
 			return buf, nil
 		}
-		s := (*[1 << 28]uint16)(p)[:len(buf)/2]
+		s := (*[1 << 28]uint16)(p)[: len(buf)/2 : len(buf)/2]
 		return utf16toutf8(s), nil
 	case api.SQL_C_TYPE_TIMESTAMP:
 		t := (*api.SQL_TIMESTAMP_STRUCT)(p)
