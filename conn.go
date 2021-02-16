@@ -75,3 +75,42 @@ func (c *Conn) newError(apiName string, handle interface{}) error {
 	}
 	return err
 }
+
+func (c *Conn) Prepare(query string) (driver.Stmt, error) {
+	if c.bad.Load().(bool) {
+		return nil, driver.ErrBadConn
+	}
+
+	var out api.SQLHANDLE
+	ret := api.SQLAllocHandle(api.SQL_HANDLE_STMT, api.SQLHANDLE(c.h), &out)
+	if IsError(ret) {
+		return nil, c.newError("SQLAllocHandle", c.h)
+	}
+	h := api.SQLHSTMT(out)
+	err := drv.Stats.updateHandleCount(api.SQL_HANDLE_STMT, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	b := api.StringToUTF16(query)
+	ret = api.SQLPrepare(h, (*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS)
+	if IsError(ret) {
+		defer releaseHandle(h)
+		return nil, c.newError("SQLPrepare", h)
+	}
+	ps, err := ExtractParameters(h)
+	if err != nil {
+		defer releaseHandle(h)
+		return nil, err
+	}
+	closed := &atomic.Value{}
+	closed.Store(false)
+	return &Stmt{
+		c:          c,
+		query:      query,
+		h:          h,
+		parameters: ps,
+		usedByStmt: true,
+		closed:     closed,
+	}, nil
+}
