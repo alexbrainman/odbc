@@ -6,6 +6,7 @@ package odbc
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -1915,5 +1916,73 @@ IF @@ROWCOUNT = 0
 
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMSSQLQueryContextTimeout(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	testingIssue5 = false
+
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	if _, qErr := db.QueryContext(ctx, "WAITFOR DELAY '00:00:10'"); qErr == nil {
+		t.Fatal("expected an error to be returned")
+	} else if !errors.Is(qErr, context.DeadlineExceeded) {
+		t.Fatalf("expected a context canceled error. got: %s", qErr.Error())
+	}
+	if time.Since(start).Seconds() > 2 {
+		t.Fatal("query should have been canceled after 1 second")
+	}
+
+	if _, qErr := db.QueryContext(ctx, "SELECT 1"); qErr == nil {
+		t.Fatal("expected an error to be returned for subsequent query on expired context")
+	} else if !errors.Is(qErr, context.DeadlineExceeded) {
+		t.Fatalf("expected a context canceled error. got: %s", qErr.Error())
+	}
+
+	if rows, qErr := db.QueryContext(context.Background(), "SELECT 1"); qErr != nil {
+		t.Fatalf("query on a fresh context should execute without error.  Got: %s", qErr.Error())
+	} else {
+		rows.Close()
+	}
+}
+
+func TestMSSQLExecContextTimeout(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	testingIssue5 = false
+
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	if _, qErr := db.ExecContext(ctx, "WAITFOR DELAY '00:00:10'"); qErr == nil {
+		t.Fatal("expected an error to be returned")
+	} else if !errors.Is(qErr, context.DeadlineExceeded) {
+		t.Fatalf("expected a context canceled error. got: %s", qErr.Error())
+	}
+	if time.Since(start).Seconds() > 2 {
+		t.Fatal("exec should have been canceled after 1 second")
+	}
+
+	if _, qErr := db.ExecContext(ctx, "SELECT 1"); qErr == nil {
+		t.Fatal("expected an error to be returned for subsequent exec on expired context")
+	} else if !errors.Is(qErr, context.DeadlineExceeded) {
+		t.Fatalf("expected a context canceled error. got: %s", qErr.Error())
+	}
+
+	if _, qErr := db.ExecContext(context.Background(), "SELECT 1"); qErr != nil {
+		t.Fatalf("exec on a fresh context should execute without error.  Got: %s", qErr.Error())
 	}
 }
