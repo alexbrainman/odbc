@@ -8,7 +8,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -17,17 +17,17 @@ import (
 
 // TODO(brainman): see if I could use SQLExecDirect anywhere
 
-type odbcStmt struct {
-	h          api.SQLHSTMT
-	parameters []Parameter
-	cols       []Column
-	// locking/lifetime
-	mu         sync.Mutex
-	usedByStmt bool
-	usedByRows bool
-}
+//type odbcStmt struct {
+//	h          api.SQLHSTMT
+//	parameters []Parameter
+//	cols       []Column
+//	// locking/lifetime
+//	mu         sync.Mutex
+//	usedByStmt bool
+//	usedByRows bool
+//}
 
-func (c *Conn) prepareODBCStmt(query string) (*odbcStmt, error) {
+func (c *Conn) prepareODBCStmt(query string) (*Stmt, error) {
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_STMT, api.SQLHANDLE(c.h), &out)
 	if IsError(ret) {
@@ -50,14 +50,19 @@ func (c *Conn) prepareODBCStmt(query string) (*odbcStmt, error) {
 		defer releaseHandle(h)
 		return nil, err
 	}
-	return &odbcStmt{
+	closed := &atomic.Value{}
+	closed.Store(false)
+	return &Stmt{
+		c:          c,
+		query:      query,
 		h:          h,
 		parameters: ps,
 		usedByStmt: true,
+		closed:     closed,
 	}, nil
 }
 
-func (s *odbcStmt) closeByStmt() error {
+func (s *Stmt) closeByStmt() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.usedByStmt {
@@ -69,7 +74,7 @@ func (s *odbcStmt) closeByStmt() error {
 	return nil
 }
 
-func (s *odbcStmt) closeByRows() error {
+func (s *Stmt) closeByRows() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.usedByRows {
@@ -87,7 +92,7 @@ func (s *odbcStmt) closeByRows() error {
 	return nil
 }
 
-func (s *odbcStmt) releaseHandle() error {
+func (s *Stmt) releaseHandle() error {
 	h := s.h
 	s.h = api.SQLHSTMT(api.SQL_NULL_HSTMT)
 	return releaseHandle(h)
@@ -95,7 +100,7 @@ func (s *odbcStmt) releaseHandle() error {
 
 var testingIssue5 bool // used during tests
 
-func (s *odbcStmt) exec(args []driver.Value, conn *Conn) error {
+func (s *Stmt) exec(args []driver.Value, conn *Conn) error {
 	if len(args) != len(s.parameters) {
 		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.parameters))
 	}
@@ -123,7 +128,7 @@ func (s *odbcStmt) exec(args []driver.Value, conn *Conn) error {
 	return nil
 }
 
-func (s *odbcStmt) bindColumns() error {
+func (s *Stmt) bindColumns() error {
 	// count columns
 	var n api.SQLSMALLINT
 	ret := api.SQLNumResultCols(s.h, &n)

@@ -12,27 +12,27 @@ import (
 )
 
 type Rows struct {
-	os *odbcStmt
+	s *Stmt
 }
 
 func (r *Rows) Columns() []string {
-	names := make([]string, len(r.os.cols))
+	names := make([]string, len(r.s.cols))
 	for i := 0; i < len(names); i++ {
-		names[i] = r.os.cols[i].Name()
+		names[i] = r.s.cols[i].Name()
 	}
 	return names
 }
 
 func (r *Rows) Next(dest []driver.Value) error {
-	ret := api.SQLFetch(r.os.h)
+	ret := api.SQLFetch(r.s.h)
 	if ret == api.SQL_NO_DATA {
 		return io.EOF
 	}
 	if IsError(ret) {
-		return NewError("SQLFetch", r.os.h)
+		return NewError("SQLFetch", r.s.h)
 	}
 	for i := range dest {
-		v, err := r.os.cols[i].Value(r.os.h, i)
+		v, err := r.s.cols[i].Value(r.s.h, i)
 		if err != nil {
 			return err
 		}
@@ -42,7 +42,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 }
 
 func (r *Rows) Close() error {
-	return r.os.closeByRows()
+	return r.s.closeByRows()
 }
 
 func (r *Rows) HasNextResultSet() bool {
@@ -50,15 +50,15 @@ func (r *Rows) HasNextResultSet() bool {
 }
 
 func (r *Rows) NextResultSet() error {
-	ret := api.SQLMoreResults(r.os.h)
+	ret := api.SQLMoreResults(r.s.h)
 	if ret == api.SQL_NO_DATA {
 		return io.EOF
 	}
 	if IsError(ret) {
-		return NewError("SQLMoreResults", r.os.h)
+		return NewError("SQLMoreResults", r.s.h)
 	}
 
-	err := r.os.bindColumns()
+	err := r.s.bindColumns()
 	if err != nil {
 		return err
 	}
