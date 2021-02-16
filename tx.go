@@ -29,7 +29,7 @@ func (c *Conn) setAutoCommitAttr(a uintptr) error {
 }
 
 func (c *Conn) Begin() (driver.Tx, error) {
-	if c.bad {
+	if c.bad.Load().(bool) {
 		return nil, driver.ErrBadConn
 	}
 	if c.tx != nil {
@@ -38,7 +38,7 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	c.tx = &Tx{c: c}
 	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_OFF)
 	if err != nil {
-		c.bad = true
+		c.bad.Store(true)
 		return nil, err
 	}
 	return c.tx, nil
@@ -56,13 +56,13 @@ func (c *Conn) endTx(commit bool) error {
 	}
 	ret := api.SQLEndTran(api.SQL_HANDLE_DBC, api.SQLHANDLE(c.h), howToEnd)
 	if IsError(ret) {
-		c.bad = true
+		c.bad.Store(true)
 		return c.newError("SQLEndTran", c.h)
 	}
 	c.tx = nil
 	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_ON)
 	if err != nil {
-		c.bad = true
+		c.bad.Store(true)
 		return err
 	}
 	return nil

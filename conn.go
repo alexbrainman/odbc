@@ -7,6 +7,7 @@ package odbc
 import (
 	"database/sql/driver"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/alexbrainman/odbc/api"
@@ -15,7 +16,7 @@ import (
 type Conn struct {
 	h                api.SQLHDBC
 	tx               *Tx
-	bad              bool
+	bad              *atomic.Value
 	isMSAccessDriver bool
 }
 
@@ -43,7 +44,9 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 		return nil, NewError("SQLDriverConnect", h)
 	}
 	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
-	return &Conn{h: h, isMSAccessDriver: isAccess}, nil
+	bad := &atomic.Value{}
+	bad.Store(false)
+	return &Conn{h: h, isMSAccessDriver: isAccess, bad: bad}, nil
 }
 
 func (c *Conn) Close() (err error) {
@@ -68,7 +71,7 @@ func (c *Conn) Close() (err error) {
 func (c *Conn) newError(apiName string, handle interface{}) error {
 	err := NewError(apiName, handle)
 	if err == driver.ErrBadConn {
-		c.bad = true
+		c.bad.Store(true)
 	}
 	return err
 }
