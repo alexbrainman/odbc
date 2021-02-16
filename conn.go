@@ -6,6 +6,7 @@ package odbc
 
 import (
 	"database/sql/driver"
+	"errors"
 	"strings"
 	"sync/atomic"
 	"unsafe"
@@ -86,4 +87,56 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 		usedByStmt: true,
 		closed:     closed,
 	}, nil
+}
+
+
+func (c *Conn) setAutoCommitAttr(a uintptr) error {
+	if testBeginErr != nil {
+		return testBeginErr
+	}
+	ret := api.SQLSetConnectUIntPtrAttr(c.h, api.SQL_ATTR_AUTOCOMMIT, a, api.SQL_IS_UINTEGER)
+	if IsError(ret) {
+		return c.newError("SQLSetConnectUIntPtrAttr", c.h)
+	}
+	return nil
+}
+
+func (c *Conn) Begin() (driver.Tx, error) {
+	if c.bad.Load().(bool) {
+		return nil, driver.ErrBadConn
+	}
+	if c.tx != nil {
+		return nil, errors.New("already in a transaction")
+	}
+	c.tx = &Tx{c: c}
+	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_OFF)
+	if err != nil {
+		c.bad.Store(true)
+		return nil, err
+	}
+	return c.tx, nil
+}
+
+func (c *Conn) endTx(commit bool) error {
+	if c.tx == nil {
+		return errors.New("not in a transaction")
+	}
+	var howToEnd api.SQLSMALLINT
+	if commit {
+		howToEnd = api.SQL_COMMIT
+	} else {
+		howToEnd = api.SQL_ROLLBACK
+	}
+	ret := api.SQLEndTran(api.SQL_HANDLE_DBC, api.SQLHANDLE(c.h), howToEnd)
+	if IsError(ret) {
+		c.bad.Store(true)
+		return c.newError("SQLEndTran", c.h)
+	}
+	c.tx = nil
+	err := c.setAutoCommitAttr(api.SQL_AUTOCOMMIT_ON)
+	if err != nil {
+		c.bad.Store(true)
+		return err
+	}
+	return nil
 }
