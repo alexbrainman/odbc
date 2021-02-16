@@ -17,17 +17,17 @@ import (
 
 // TODO(brainman): see if I could use SQLExecDirect anywhere
 
-type ODBCStmt struct {
+type odbcStmt struct {
 	h          api.SQLHSTMT
-	Parameters []Parameter
-	Cols       []Column
+	parameters []Parameter
+	cols       []Column
 	// locking/lifetime
 	mu         sync.Mutex
 	usedByStmt bool
 	usedByRows bool
 }
 
-func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
+func (c *Conn) prepareODBCStmt(query string) (*odbcStmt, error) {
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_STMT, api.SQLHANDLE(c.h), &out)
 	if IsError(ret) {
@@ -50,14 +50,14 @@ func (c *Conn) PrepareODBCStmt(query string) (*ODBCStmt, error) {
 		defer releaseHandle(h)
 		return nil, err
 	}
-	return &ODBCStmt{
+	return &odbcStmt{
 		h:          h,
-		Parameters: ps,
+		parameters: ps,
 		usedByStmt: true,
 	}, nil
 }
 
-func (s *ODBCStmt) closeByStmt() error {
+func (s *odbcStmt) closeByStmt() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.usedByStmt {
@@ -69,7 +69,7 @@ func (s *ODBCStmt) closeByStmt() error {
 	return nil
 }
 
-func (s *ODBCStmt) closeByRows() error {
+func (s *odbcStmt) closeByRows() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.usedByRows {
@@ -87,7 +87,7 @@ func (s *ODBCStmt) closeByRows() error {
 	return nil
 }
 
-func (s *ODBCStmt) releaseHandle() error {
+func (s *odbcStmt) releaseHandle() error {
 	h := s.h
 	s.h = api.SQLHSTMT(api.SQL_NULL_HSTMT)
 	return releaseHandle(h)
@@ -95,9 +95,9 @@ func (s *ODBCStmt) releaseHandle() error {
 
 var testingIssue5 bool // used during tests
 
-func (s *ODBCStmt) Exec(args []driver.Value, conn *Conn) error {
-	if len(args) != len(s.Parameters) {
-		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.Parameters))
+func (s *odbcStmt) exec(args []driver.Value, conn *Conn) error {
+	if len(args) != len(s.parameters) {
+		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.parameters))
 	}
 	for i, a := range args {
 		// this could be done in 2 steps:
@@ -105,7 +105,7 @@ func (s *ODBCStmt) Exec(args []driver.Value, conn *Conn) error {
 		// 2) set their (vars) values here;
 		// but rebinding parameters for every new parameter value
 		// should be efficient enough for our purpose.
-		if err := s.Parameters[i].BindValue(s.h, i, a, conn); err != nil {
+		if err := s.parameters[i].BindValue(s.h, i, a, conn); err != nil {
 			return err
 		}
 	}
@@ -123,7 +123,7 @@ func (s *ODBCStmt) Exec(args []driver.Value, conn *Conn) error {
 	return nil
 }
 
-func (s *ODBCStmt) BindColumns() error {
+func (s *odbcStmt) bindColumns() error {
 	// count columns
 	var n api.SQLSMALLINT
 	ret := api.SQLNumResultCols(s.h, &n)
@@ -134,21 +134,21 @@ func (s *ODBCStmt) BindColumns() error {
 		return errors.New("Stmt did not create a result set")
 	}
 	// fetch column descriptions
-	s.Cols = make([]Column, n)
+	s.cols = make([]Column, n)
 	binding := true
-	for i := range s.Cols {
+	for i := range s.cols {
 		c, err := NewColumn(s.h, i)
 		if err != nil {
 			return err
 		}
-		s.Cols[i] = c
+		s.cols[i] = c
 		// Once we found one non-bindable column, we will not bind the rest.
 		// http://www.easysoft.com/developer/languages/c/odbc-tutorial-fetching-results.html
 		// ... One common restriction is that SQLGetData may only be called on columns after the last bound column. ...
 		if !binding {
 			continue
 		}
-		bound, err := s.Cols[i].Bind(s.h, i)
+		bound, err := s.cols[i].Bind(s.h, i)
 		if err != nil {
 			return err
 		}

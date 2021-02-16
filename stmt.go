@@ -15,7 +15,7 @@ import (
 type Stmt struct {
 	c     *Conn
 	query string
-	os    *ODBCStmt
+	os    *odbcStmt
 	mu    sync.Mutex
 }
 
@@ -23,7 +23,7 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	if c.bad.Load().(bool) {
 		return nil, driver.ErrBadConn
 	}
-	os, err := c.PrepareODBCStmt(query)
+	os, err := c.prepareODBCStmt(query)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (s *Stmt) NumInput() int {
 	if s.os == nil {
 		return -1
 	}
-	return len(s.os.Parameters)
+	return len(s.os.parameters)
 }
 
 func (s *Stmt) Close() error {
@@ -55,13 +55,13 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if s.os.usedByRows {
 		s.os.closeByStmt()
 		s.os = nil
-		os, err := s.c.PrepareODBCStmt(s.query)
+		os, err := s.c.prepareODBCStmt(s.query)
 		if err != nil {
 			return nil, err
 		}
 		s.os = os
 	}
-	err := s.os.Exec(args, s.c)
+	err := s.os.exec(args, s.c)
 	if err != nil {
 		return nil, err
 	}
@@ -89,17 +89,17 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if s.os.usedByRows {
 		s.os.closeByStmt()
 		s.os = nil
-		os, err := s.c.PrepareODBCStmt(s.query)
+		os, err := s.c.prepareODBCStmt(s.query)
 		if err != nil {
 			return nil, err
 		}
 		s.os = os
 	}
-	err := s.os.Exec(args, s.c)
+	err := s.os.exec(args, s.c)
 	if err != nil {
 		return nil, err
 	}
-	err = s.os.BindColumns()
+	err = s.os.bindColumns()
 	if err != nil {
 		return nil, err
 	}

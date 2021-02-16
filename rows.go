@@ -12,13 +12,13 @@ import (
 )
 
 type Rows struct {
-	os *ODBCStmt
+	os *odbcStmt
 }
 
 func (r *Rows) Columns() []string {
-	names := make([]string, len(r.os.Cols))
+	names := make([]string, len(r.os.cols))
 	for i := 0; i < len(names); i++ {
-		names[i] = r.os.Cols[i].Name()
+		names[i] = r.os.cols[i].Name()
 	}
 	return names
 }
@@ -32,7 +32,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 		return NewError("SQLFetch", r.os.h)
 	}
 	for i := range dest {
-		v, err := r.os.Cols[i].Value(r.os.h, i)
+		v, err := r.os.cols[i].Value(r.os.h, i)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (r *Rows) NextResultSet() error {
 		return NewError("SQLMoreResults", r.os.h)
 	}
 
-	err := r.os.BindColumns()
+	err := r.os.bindColumns()
 	if err != nil {
 		return err
 	}
