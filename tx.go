@@ -10,11 +10,12 @@ type Tx struct {
 
 var testBeginErr error // used during tests
 
-
+// implement driver.Tx
 func (tx *Tx) Commit() error {
 	return tx.c.endTx(true)
 }
 
+// implement driver.Tx
 func (tx *Tx) Rollback() error {
 	return tx.c.endTx(false)
 }

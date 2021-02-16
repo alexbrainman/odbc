@@ -15,6 +15,7 @@ type Rows struct {
 	s *Stmt
 }
 
+// implement driver.Rows
 func (r *Rows) Columns() []string {
 	names := make([]string, len(r.s.cols))
 	for i := 0; i < len(names); i++ {
@@ -23,6 +24,7 @@ func (r *Rows) Columns() []string {
 	return names
 }
 
+// implement driver.Rows
 func (r *Rows) Next(dest []driver.Value) error {
 	ret := api.SQLFetch(r.s.h)
 	if ret == api.SQL_NO_DATA {
@@ -41,14 +43,17 @@ func (r *Rows) Next(dest []driver.Value) error {
 	return nil
 }
 
+// implement driver.Rows
 func (r *Rows) Close() error {
 	return r.s.closeByRows()
 }
 
+// implement driver.RowsNextResultSet
 func (r *Rows) HasNextResultSet() bool {
 	return true
 }
 
+// implement driver.RowsNextResultSet
 func (r *Rows) NextResultSet() error {
 	ret := api.SQLMoreResults(r.s.h)
 	if ret == api.SQL_NO_DATA {

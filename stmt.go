@@ -32,6 +32,7 @@ type Stmt struct {
 	closed *atomic.Value
 }
 
+// implement driver.Stmt
 func (s *Stmt) NumInput() int {
 	if s.closed.Load().(bool) {
 		return -1
@@ -39,6 +40,7 @@ func (s *Stmt) NumInput() int {
 	return len(s.parameters)
 }
 
+// implement driver.Stmt
 func (s *Stmt) Close() error {
 	if s.closed.Load().(bool) {
 		return errors.New("Stmt is already closed")
@@ -48,6 +50,7 @@ func (s *Stmt) Close() error {
 	return ret
 }
 
+// implement driver.Stmt
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if s.closed.Load().(bool) {
 		return nil, errors.New("Stmt is closed")
@@ -82,6 +85,7 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	return &Result{rowCount: sumRowCount}, nil
 }
 
+// implement driver.Stmt
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if s.closed.Load().(bool) {
 		return nil, errors.New("Stmt is closed")

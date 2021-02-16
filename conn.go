@@ -23,6 +23,7 @@ type Conn struct {
 
 var accessDriverSubstr = strings.ToUpper(strings.Replace("DRIVER={Microsoft Access Driver", " ", "", -1))
 
+// implement driver.Conn
 func (c *Conn) Close() (err error) {
 	if c.tx != nil {
 		c.tx.Rollback()
@@ -50,6 +51,7 @@ func (c *Conn) newError(apiName string, handle interface{}) error {
 	return err
 }
 
+// implement driver.Conn
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	if c.bad.Load().(bool) {
 		return nil, driver.ErrBadConn
@@ -89,7 +91,6 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	}, nil
 }
 
-
 func (c *Conn) setAutoCommitAttr(a uintptr) error {
 	if testBeginErr != nil {
 		return testBeginErr
@@ -101,6 +102,7 @@ func (c *Conn) setAutoCommitAttr(a uintptr) error {
 	return nil
 }
 
+// implement driver.Conn
 func (c *Conn) Begin() (driver.Tx, error) {
 	if c.bad.Load().(bool) {
 		return nil, driver.ErrBadConn

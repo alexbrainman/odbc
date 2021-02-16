@@ -67,6 +67,7 @@ func initDriver() error {
 	return nil
 }
 
+//TODO(ninthclowd): this is not part of the driver.Driver interface and will never be called
 func (d *Driver) Close() error {
 	// TODO(brainman): who will call (*Driver).Close (to dispose all opened handles)?
 	h := d.h
@@ -82,6 +83,7 @@ func init() {
 	sql.Register("odbc", &drv)
 }
 
+// implement driver.Driver
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
 	if d.initErr != nil {
 		return nil, d.initErr
