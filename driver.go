@@ -8,6 +8,10 @@ package odbc
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"strings"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/alexbrainman/odbc/api"
 )
@@ -76,4 +80,31 @@ func init() {
 		drv.initErr = err
 	}
 	sql.Register("odbc", &drv)
+}
+
+func (d *Driver) Open(dsn string) (driver.Conn, error) {
+	if d.initErr != nil {
+		return nil, d.initErr
+	}
+
+	var out api.SQLHANDLE
+	ret := api.SQLAllocHandle(api.SQL_HANDLE_DBC, api.SQLHANDLE(d.h), &out)
+	if IsError(ret) {
+		return nil, NewError("SQLAllocHandle", d.h)
+	}
+	h := api.SQLHDBC(out)
+	drv.Stats.updateHandleCount(api.SQL_HANDLE_DBC, 1)
+
+	b := api.StringToUTF16(dsn)
+	ret = api.SQLDriverConnect(h, 0,
+		(*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS,
+		nil, 0, nil, api.SQL_DRIVER_NOPROMPT)
+	if IsError(ret) {
+		defer releaseHandle(h)
+		return nil, NewError("SQLDriverConnect", h)
+	}
+	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
+	bad := &atomic.Value{}
+	bad.Store(false)
+	return &Conn{h: h, isMSAccessDriver: isAccess, bad: bad}, nil
 }
