@@ -12,10 +12,10 @@ type connector struct {
 
 //implement driver.Connector
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
-	panic("implement me")
+	return c.d.open(c.name, ctx)
 }
 
 //implement driver.Connector
 func (c *connector) Driver() driver.Driver {
-	panic("implement me")
+	return c.d
 }

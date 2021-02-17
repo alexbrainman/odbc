@@ -5,6 +5,7 @@
 package odbc
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -30,6 +31,7 @@ type Stmt struct {
 	usedByRows bool
 
 	closed *atomic.Value
+	ctx    context.Context
 }
 
 // implement driver.Stmt

@@ -5,6 +5,7 @@
 package odbc
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"strings"
@@ -19,6 +20,7 @@ type Conn struct {
 	tx               *Tx
 	bad              *atomic.Value
 	isMSAccessDriver bool
+	ctx              context.Context
 }
 
 var accessDriverSubstr = strings.ToUpper(strings.Replace("DRIVER={Microsoft Access Driver", " ", "", -1))
@@ -88,6 +90,7 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 		parameters: ps,
 		usedByStmt: true,
 		closed:     closed,
+		ctx:        c.ctx,
 	}, nil
 }
 

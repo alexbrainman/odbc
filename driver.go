@@ -7,6 +7,7 @@
 package odbc
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"strings"
@@ -85,6 +86,10 @@ func init() {
 
 // implement driver.Driver
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
+	return d.open(dsn, context.Background())
+}
+
+func (d *Driver) open(dsn string, ctx context.Context) (driver.Conn, error) {
 	if d.initErr != nil {
 		return nil, d.initErr
 	}
@@ -108,5 +113,5 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
 	bad := &atomic.Value{}
 	bad.Store(false)
-	return &Conn{h: h, isMSAccessDriver: isAccess, bad: bad}, nil
+	return &Conn{h: h, isMSAccessDriver: isAccess, bad: bad, ctx: ctx}, nil
 }
