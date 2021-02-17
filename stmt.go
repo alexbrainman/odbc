@@ -9,12 +9,13 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/alexbrainman/odbc/api"
+	"go.uber.org/atomic"
 )
+
+var ErrStmtClosed = errors.New("statement is closed")
 
 // TODO(brainman): see if I could use SQLExecDirect anywhere
 
@@ -25,18 +26,16 @@ type Stmt struct {
 	h          api.SQLHSTMT
 	parameters []Parameter
 	cols       []Column
-	// locking/lifetime
-	mu         sync.Mutex
-	usedByStmt bool
-	usedByRows bool
 
-	closed *atomic.Value
+	rows *Rows
+
+	closed *atomic.Bool
 	ctx    context.Context
 }
 
 // implement driver.Stmt
 func (s *Stmt) NumInput() int {
-	if s.closed.Load().(bool) {
+	if s.closed.Load() {
 		return -1
 	}
 	return len(s.parameters)
@@ -44,34 +43,28 @@ func (s *Stmt) NumInput() int {
 
 // implement driver.Stmt
 func (s *Stmt) Close() error {
-	if s.closed.Load().(bool) {
-		return errors.New("Stmt is already closed")
+	if s.closed.Load() {
+		return ErrStmtClosed
 	}
-	ret := s.closeByStmt()
 	s.closed.Store(true)
-	return ret
+
+	if s.rows == nil {
+		return s.releaseHandle()
+	}
+
+	return nil
 }
 
-// implement driver.Stmt
+// implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	if s.closed.Load().(bool) {
-		return nil, errors.New("Stmt is closed")
+	if s.closed.Load() {
+		return nil, ErrStmtClosed
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.usedByRows {
-		s.closeByStmt()
-		s.closed.Store(true)
-		os, err := s.c.Prepare(s.query)
-		if err != nil {
-			return nil, err
-		}
-		*s = *os.(*Stmt)
-	}
-	err := s.exec(args, s.c)
-	if err != nil {
+
+	if err := s.exec(args, s.c); err != nil {
 		return nil, err
 	}
+
 	var sumRowCount int64
 	for {
 		var c api.SQLLEN
@@ -87,62 +80,22 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	return &Result{rowCount: sumRowCount}, nil
 }
 
-// implement driver.Stmt
+// implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	if s.closed.Load().(bool) {
-		return nil, errors.New("Stmt is closed")
+	if s.closed.Load() {
+		return nil, ErrStmtClosed
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.usedByRows {
-		s.closeByStmt()
-		s.closed.Store(true)
-		os, err := s.c.Prepare(s.query)
-		if err != nil {
-			return nil, err
-		}
-		*s = *os.(*Stmt)
-	}
-	err := s.exec(args, s.c)
-	if err != nil {
+
+	if err := s.exec(args, s.c); err != nil {
 		return nil, err
 	}
-	err = s.bindColumns()
-	if err != nil {
+
+	if err := s.bindColumns(); err != nil {
 		return nil, err
 	}
-	s.usedByRows = true // now both Stmt and Rows refer to it
-	return &Rows{s: s}, nil
-}
 
-func (s *Stmt) closeByStmt() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.usedByStmt {
-		defer func() { s.usedByStmt = false }()
-		if !s.usedByRows {
-			return s.releaseHandle()
-		}
-	}
-	return nil
-}
-
-func (s *Stmt) closeByRows() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.usedByRows {
-		defer func() { s.usedByRows = false }()
-		if s.usedByStmt {
-			ret := api.SQLCloseCursor(s.h)
-			if IsError(ret) {
-				return NewError("SQLCloseCursor", s.h)
-			}
-			return nil
-		} else {
-			return s.releaseHandle()
-		}
-	}
-	return nil
+	s.rows = &Rows{s: s}
+	return s.rows, nil
 }
 
 func (s *Stmt) releaseHandle() error {
@@ -189,7 +142,7 @@ func (s *Stmt) bindColumns() error {
 		return NewError("SQLNumResultCols", s.h)
 	}
 	if n < 1 {
-		return errors.New("Stmt did not create a result set")
+		return errors.New("statement did not create a result set")
 	}
 	// fetch column descriptions
 	s.cols = make([]Column, n)

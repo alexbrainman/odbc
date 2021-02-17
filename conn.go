@@ -9,16 +9,16 @@ import (
 	"database/sql/driver"
 	"errors"
 	"strings"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/alexbrainman/odbc/api"
+	"go.uber.org/atomic"
 )
 
 type Conn struct {
 	h                api.SQLHDBC
 	tx               *Tx
-	bad              *atomic.Value
+	bad              *atomic.Bool
 	isMSAccessDriver bool
 	ctx              context.Context
 }
@@ -55,7 +55,7 @@ func (c *Conn) newError(apiName string, handle interface{}) error {
 
 // implement driver.Conn
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
-	if c.bad.Load().(bool) {
+	if c.bad.Load() {
 		return nil, driver.ErrBadConn
 	}
 
@@ -81,15 +81,14 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 		defer releaseHandle(h)
 		return nil, err
 	}
-	closed := &atomic.Value{}
-	closed.Store(false)
+
 	return &Stmt{
 		c:          c,
 		query:      query,
 		h:          h,
 		parameters: ps,
-		usedByStmt: true,
-		closed:     closed,
+		rows:       nil,
+		closed:     atomic.NewBool(false),
 		ctx:        c.ctx,
 	}, nil
 }
@@ -107,7 +106,7 @@ func (c *Conn) setAutoCommitAttr(a uintptr) error {
 
 // implement driver.Conn
 func (c *Conn) Begin() (driver.Tx, error) {
-	if c.bad.Load().(bool) {
+	if c.bad.Load() {
 		return nil, driver.ErrBadConn
 	}
 	if c.tx != nil {

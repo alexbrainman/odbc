@@ -11,10 +11,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"strings"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/alexbrainman/odbc/api"
+	"go.uber.org/atomic"
 )
 
 var drv Driver
@@ -111,7 +111,5 @@ func (d *Driver) open(dsn string, ctx context.Context) (driver.Conn, error) {
 		return nil, NewError("SQLDriverConnect", h)
 	}
 	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
-	bad := &atomic.Value{}
-	bad.Store(false)
-	return &Conn{h: h, isMSAccessDriver: isAccess, bad: bad, ctx: ctx}, nil
+	return &Conn{h: h, isMSAccessDriver: isAccess, bad: atomic.NewBool(false), ctx: ctx}, nil
 }
