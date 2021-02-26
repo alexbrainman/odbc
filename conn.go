@@ -88,7 +88,7 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 		h:          h,
 		parameters: ps,
 		rows:       nil,
-		closed:     atomic.NewBool(false),
+		closed:     false,
 		ctx:        c.ctx,
 	}, nil
 }

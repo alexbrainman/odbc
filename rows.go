@@ -46,7 +46,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 // implement driver.Rows
 func (r *Rows) Close() error {
 	r.s.rows = nil
-	if !r.s.closed.Load() {
+	if !r.s.closed {
 		ret := api.SQLCloseCursor(r.s.h)
 		if IsError(ret) {
 			return NewError("SQLCloseCursor", r.s.h)

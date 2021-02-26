@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alexbrainman/odbc/api"
-	"go.uber.org/atomic"
 )
 
 var ErrStmtClosed = errors.New("statement is closed")
@@ -27,15 +26,17 @@ type Stmt struct {
 	parameters []Parameter
 	cols       []Column
 
+	//each statement can only have one open rows.  If a second query is executed while rows is still open,
+	//the driver will prepare a new statement to execute on
 	rows *Rows
 
-	closed *atomic.Bool
+	closed bool
 	ctx    context.Context
 }
 
 // implement driver.Stmt
 func (s *Stmt) NumInput() int {
-	if s.closed.Load() {
+	if s.closed {
 		return -1
 	}
 	return len(s.parameters)
@@ -43,10 +44,10 @@ func (s *Stmt) NumInput() int {
 
 // implement driver.Stmt
 func (s *Stmt) Close() error {
-	if s.closed.Load() {
+	if s.closed {
 		return ErrStmtClosed
 	}
-	s.closed.Store(true)
+	s.closed = true
 
 	if s.rows == nil {
 		return s.releaseHandle()
@@ -57,7 +58,7 @@ func (s *Stmt) Close() error {
 
 // implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	if s.closed.Load() {
+	if s.closed {
 		return nil, ErrStmtClosed
 	}
 
@@ -82,7 +83,7 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 
 // implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	if s.closed.Load() {
+	if s.closed {
 		return nil, ErrStmtClosed
 	}
 
