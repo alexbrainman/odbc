@@ -45,16 +45,15 @@ func (r *Rows) Next(dest []driver.Value) error {
 
 // implement driver.Rows
 func (r *Rows) Close() error {
-	r.s.rows = nil
-	if !r.s.closed {
-		ret := api.SQLCloseCursor(r.s.h)
-		if IsError(ret) {
-			return NewError("SQLCloseCursor", r.s.h)
-		}
+	if r.s.c.closingInBG.Load() {
+		//if we are cancelling/closing in a background thread, ignore requests to Close this statement from the driver
 		return nil
-	} else {
-		return r.s.releaseHandle()
 	}
+	r.s.rows = nil
+	if ret := api.SQLCloseCursor(r.s.h); IsError(ret) {
+		return NewError("SQLCloseCursor", r.s.h)
+	}
+	return nil
 }
 
 // implement driver.RowsNextResultSet

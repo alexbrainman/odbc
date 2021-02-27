@@ -35,8 +35,8 @@ func SQLBindParameter(statementHandle SQLHSTMT, parameterNumber SQLUSMALLINT, in
 	return SQLRETURN(r)
 }
 
-func SQLCancelHandle(HandleType SQLSMALLINT, Handle SQLHANDLE) (ret SQLRETURN) {
-	r := C.SQLCancelHandle(C.SQLSMALLINT(HandleType), C.SQLHANDLE(Handle))
+func SQLCancel(statementHandle SQLHSTMT) (ret SQLRETURN) {
+	r := C.SQLCancel(C.SQLHSTMT(statementHandle))
 	return SQLRETURN(r)
 }
 

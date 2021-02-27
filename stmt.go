@@ -8,13 +8,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/alexbrainman/odbc/api"
 )
-
-var ErrStmtClosed = errors.New("statement is closed")
 
 // TODO(brainman): see if I could use SQLExecDirect anywhere
 
@@ -29,110 +25,46 @@ type Stmt struct {
 	//each statement can only have one open rows.  If a second query is executed while rows is still open,
 	//the driver will prepare a new statement to execute on
 	rows *Rows
-
-	closed bool
-	ctx    context.Context
 }
 
 // implement driver.Stmt
 func (s *Stmt) NumInput() int {
-	if s.closed {
+	if s.parameters == nil {
 		return -1
 	}
 	return len(s.parameters)
 }
 
 // implement driver.Stmt
+// Close closes the statement.
+//
+// As of Go 1.1, a Stmt will not be closed if it's in use
+// by any queries.
 func (s *Stmt) Close() error {
-	if s.closed {
-		return ErrStmtClosed
+	if s.c.closingInBG.Load() {
+		//if we are cancelling/closing in a background thread, ignore requests to Close this statement from the driver
+		return nil
 	}
-	s.closed = true
-
-	if s.rows == nil {
-		return s.releaseHandle()
-	}
-
-	return nil
+	return s.close()
+}
+func (s *Stmt) close() error {
+	return s.releaseHandle()
 }
 
 // implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	if s.closed {
-		return nil, ErrStmtClosed
-	}
-
-	if err := s.exec(args, s.c); err != nil {
-		return nil, err
-	}
-
-	var sumRowCount int64
-	for {
-		var c api.SQLLEN
-		ret := api.SQLRowCount(s.h, &c)
-		if IsError(ret) {
-			return nil, NewError("SQLRowCount", s.h)
-		}
-		sumRowCount += int64(c)
-		if ret = api.SQLMoreResults(s.h); ret == api.SQL_NO_DATA {
-			break
-		}
-	}
-	return &Result{rowCount: sumRowCount}, nil
+	return s.ExecContext(context.Background(), toNamedValues(args))
 }
 
 // implement driver.Stmt - per documentation, not supposed to be used by multiple goroutines
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	if s.closed {
-		return nil, ErrStmtClosed
-	}
-
-	if err := s.exec(args, s.c); err != nil {
-		return nil, err
-	}
-
-	if err := s.bindColumns(); err != nil {
-		return nil, err
-	}
-
-	s.rows = &Rows{s: s}
-	return s.rows, nil
+	return s.QueryContext(context.Background(), toNamedValues(args))
 }
 
 func (s *Stmt) releaseHandle() error {
 	h := s.h
 	s.h = api.SQLHSTMT(api.SQL_NULL_HSTMT)
 	return releaseHandle(h)
-}
-
-var testingIssue5 bool // used during tests
-
-func (s *Stmt) exec(args []driver.Value, conn *Conn) error {
-	if len(args) != len(s.parameters) {
-		return fmt.Errorf("wrong number of arguments %d, %d expected", len(args), len(s.parameters))
-	}
-	for i, a := range args {
-		// this could be done in 2 steps:
-		// 1) bind vars right after prepare;
-		// 2) set their (vars) values here;
-		// but rebinding parameters for every new parameter value
-		// should be efficient enough for our purpose.
-		if err := s.parameters[i].BindValue(s.h, i, a, conn); err != nil {
-			return err
-		}
-	}
-	if testingIssue5 {
-		time.Sleep(10 * time.Microsecond)
-	}
-	ret := api.SQLExecute(s.h)
-	if ret == api.SQL_NO_DATA {
-		// success but no data to report
-		return nil
-	}
-	if IsError(ret) {
-		return NewError("SQLExecute", s.h)
-	}
-	return nil
 }
 
 func (s *Stmt) bindColumns() error {
@@ -169,4 +101,16 @@ func (s *Stmt) bindColumns() error {
 		}
 	}
 	return nil
+}
+
+func toNamedValues(values []driver.Value) []driver.NamedValue {
+	namedValues := make([]driver.NamedValue, len(values))
+	for idx, value := range values {
+		namedValues[idx] = driver.NamedValue{
+			Name:    "",
+			Ordinal: idx + 1,
+			Value:   value,
+		}
+	}
+	return namedValues
 }

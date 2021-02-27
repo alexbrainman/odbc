@@ -1696,9 +1696,9 @@ func TestMSSQLMarkBeginBadConn(t *testing.T) {
 		}()
 
 		// database/sql might return the broken driver.Conn to the pool. The
-		// next operation on the driver connection must return
-		// driver.ErrBadConn to prevent the bad connection from getting used
-		// again.
+		// next operation on the driver connection should return
+		// driver.ErrBadConn, or driver.SessionResetter should return driver.ErrBadConn
+		// to prevent the bad connection from getting used again.
 		if should, is := driver.ErrBadConn, nextFn(dc); should != is {
 			t.Errorf("%s: should=\"%v\", is=\"%v\"", label, should, is)
 		}

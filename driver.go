@@ -68,7 +68,7 @@ func initDriver() error {
 	return nil
 }
 
-//TODO(ninthclowd): this is not part of the driver.Driver interface and will never be called
+//TODO(ninthclowd): this is not part of the driver.Driver interface and will never be called by a consumer
 func (d *Driver) Close() error {
 	// TODO(brainman): who will call (*Driver).Close (to dispose all opened handles)?
 	h := d.h
@@ -85,15 +85,15 @@ func init() {
 }
 
 // implement driver.Driver
-func (d *Driver) Open(dsn string) (driver.Conn, error) {
-	return d.open(dsn, context.Background())
+func (d *Driver) Open(name string) (driver.Conn, error) {
+	return d.open(name, context.Background())
 }
 
-func (d *Driver) open(dsn string, ctx context.Context) (driver.Conn, error) {
+func (d *Driver) open(name string, dialContext context.Context) (driver.Conn, error) {
 	if d.initErr != nil {
 		return nil, d.initErr
 	}
-
+	//TODO(ninthclowd): return early if dialContext expires while connecting
 	var out api.SQLHANDLE
 	ret := api.SQLAllocHandle(api.SQL_HANDLE_DBC, api.SQLHANDLE(d.h), &out)
 	if IsError(ret) {
@@ -102,7 +102,7 @@ func (d *Driver) open(dsn string, ctx context.Context) (driver.Conn, error) {
 	h := api.SQLHDBC(out)
 	drv.Stats.updateHandleCount(api.SQL_HANDLE_DBC, 1)
 
-	b := api.StringToUTF16(dsn)
+	b := api.StringToUTF16(name)
 	ret = api.SQLDriverConnect(h, 0,
 		(*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS,
 		nil, 0, nil, api.SQL_DRIVER_NOPROMPT)
@@ -110,6 +110,6 @@ func (d *Driver) open(dsn string, ctx context.Context) (driver.Conn, error) {
 		defer releaseHandle(h)
 		return nil, NewError("SQLDriverConnect", h)
 	}
-	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
-	return &Conn{h: h, isMSAccessDriver: isAccess, bad: atomic.NewBool(false), ctx: ctx}, nil
+	isAccess := strings.Contains(strings.ToUpper(strings.Replace(name, " ", "", -1)), accessDriverSubstr)
+	return &Conn{h: h, isMSAccessDriver: isAccess, bad: atomic.NewBool(false), closingInBG: atomic.NewBool(false)}, nil
 }
