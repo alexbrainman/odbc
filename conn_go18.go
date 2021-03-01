@@ -121,7 +121,7 @@ func (c *Conn) Ping(ctx context.Context) error {
 	if c.bad.Load() {
 		return driver.ErrBadConn
 	}
-	stmt, err := c.PrepareContext(ctx, ";")
+	stmt, err := c.PrepareContext(ctx, "SELECT 1")
 	if err != nil {
 		return driver.ErrBadConn
 	}
