@@ -1,0 +1,8 @@
+# github.com/go-ole/go-ole v1.2.5
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
+# go.uber.org/atomic v1.7.0
+go.uber.org/atomic
+# golang.org/x/sys v0.0.0-20210228012217-479acdf4ea46
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/windows
