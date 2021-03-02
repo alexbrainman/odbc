@@ -6,28 +6,25 @@ package odbc
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/alexbrainman/odbc/api"
+	"go.uber.org/atomic"
 )
 
 type Stats struct {
-	EnvCount  int
-	ConnCount int
-	StmtCount int
-	mu        sync.Mutex
+	EnvCount  *atomic.Int32
+	ConnCount *atomic.Int32
+	StmtCount *atomic.Int32
 }
 
-func (s *Stats) updateHandleCount(handleType api.SQLSMALLINT, change int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Stats) updateHandleCount(handleType api.SQLSMALLINT, change int32) error {
 	switch handleType {
 	case api.SQL_HANDLE_ENV:
-		s.EnvCount += change
+		s.EnvCount.Add(change)
 	case api.SQL_HANDLE_DBC:
-		s.ConnCount += change
+		s.ConnCount.Add(change)
 	case api.SQL_HANDLE_STMT:
-		s.StmtCount += change
+		s.StmtCount.Add(change)
 	default:
 		return fmt.Errorf("unexpected handle type %d", handleType)
 	}

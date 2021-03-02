@@ -70,10 +70,7 @@ func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 		return nil, c.newError("SQLAllocHandle", c.h)
 	}
 	h := api.SQLHSTMT(out)
-	err := drv.Stats.updateHandleCount(api.SQL_HANDLE_STMT, 1)
-	if err != nil {
-		return nil, err
-	}
+	drv.Stats.StmtCount.Inc()
 
 	b := api.StringToUTF16(query)
 	ret = api.SQLPrepare(h, (*api.SQLWCHAR)(unsafe.Pointer(&b[0])), api.SQL_NTS)

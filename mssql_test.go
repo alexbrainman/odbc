@@ -110,26 +110,26 @@ func (params connParams) makeODBCConnectionString() string {
 	return c
 }
 
-func mssqlConnectWithParams(params connParams) (db *sql.DB, stmtCount int, err error) {
+func mssqlConnectWithParams(params connParams) (db *sql.DB, stmtCount int32, err error) {
 	db, err = sql.Open("odbc", params.makeODBCConnectionString())
 	if err != nil {
 		return nil, 0, err
 	}
 	stats := db.Driver().(*Driver).Stats
-	return db, stats.StmtCount, nil
+	return db, stats.StmtCount.Load(), nil
 }
 
-func mssqlConnect() (db *sql.DB, stmtCount int, err error) {
+func mssqlConnect() (db *sql.DB, stmtCount int32, err error) {
 	return mssqlConnectWithParams(newConnParams())
 }
 
-func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int) {
+func closeDB(t *testing.T, db *sql.DB, shouldStmtCount, ignoreIfStmtCount int32) {
 	s := db.Driver().(*Driver).Stats
 	err := db.Close()
 	if err != nil {
 		t.Fatalf("error closing DB: %v", err)
 	}
-	switch s.StmtCount {
+	switch s.StmtCount.Load() {
 	case shouldStmtCount:
 		// all good
 	case ignoreIfStmtCount:
@@ -867,8 +867,9 @@ func TestMSSQLStmtAndRows(t *testing.T) {
 		}
 	}()
 
-	if db.Driver().(*Driver).Stats.StmtCount != sc {
-		t.Fatalf("invalid statement count: expected %v, is %v", sc, db.Driver().(*Driver).Stats.StmtCount)
+	gotSC := db.Driver().(*Driver).Stats.StmtCount.Load()
+	if gotSC != sc {
+		t.Fatalf("invalid statement count: expected %v, is %v", sc, gotSC)
 	}
 
 	// no resource tracking past this point
@@ -1581,12 +1582,12 @@ func TestMSSQLMarkTxBadConn(t *testing.T) {
 	testFn := func(endTx func(driver.Tx) error, nextFn func(driver.Conn) error) {
 		proxy.restart()
 
-		cc, sc := drv.Stats.ConnCount, drv.Stats.StmtCount
+		cc, sc := drv.Stats.ConnCount.Load(), drv.Stats.StmtCount.Load()
 		defer func() {
-			if should, is := sc, drv.Stats.StmtCount; should != is {
+			if should, is := sc, drv.Stats.StmtCount.Load(); should != is {
 				t.Errorf("leaked statement, should=%d, is=%d", should, is)
 			}
-			if should, is := cc, drv.Stats.ConnCount; should != is {
+			if should, is := cc, drv.Stats.ConnCount.Load(); should != is {
 				t.Errorf("leaked connection, should=%d, is=%d", should, is)
 			}
 		}()
@@ -1662,12 +1663,12 @@ func TestMSSQLMarkBeginBadConn(t *testing.T) {
 	params := newConnParams()
 
 	testFn := func(label string, nextFn func(driver.Conn) error) {
-		cc, sc := drv.Stats.ConnCount, drv.Stats.StmtCount
+		cc, sc := drv.Stats.ConnCount.Load(), drv.Stats.StmtCount.Load()
 		defer func() {
-			if should, is := sc, drv.Stats.StmtCount; should != is {
+			if should, is := sc, drv.Stats.StmtCount.Load(); should != is {
 				t.Errorf("leaked statement, should=%d, is=%d", should, is)
 			}
-			if should, is := cc, drv.Stats.ConnCount; should != is {
+			if should, is := cc, drv.Stats.ConnCount.Load(); should != is {
 				t.Errorf("leaked connection, should=%d, is=%d", should, is)
 			}
 		}()

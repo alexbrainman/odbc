@@ -26,7 +26,12 @@ type Driver struct {
 }
 
 func initDriver() error {
-
+	//initialize allocation counters
+	drv.Stats = Stats{
+		EnvCount:  atomic.NewInt32(0),
+		ConnCount: atomic.NewInt32(0),
+		StmtCount: atomic.NewInt32(0),
+	}
 	//Allocate environment handle
 	var out api.SQLHANDLE
 	in := api.SQLHANDLE(api.SQL_NULL_HANDLE)
@@ -35,10 +40,7 @@ func initDriver() error {
 		return NewError("SQLAllocHandle", api.SQLHENV(in))
 	}
 	drv.h = api.SQLHENV(out)
-	err := drv.Stats.updateHandleCount(api.SQL_HANDLE_ENV, 1)
-	if err != nil {
-		return err
-	}
+	drv.Stats.EnvCount.Inc()
 
 	// will use ODBC v3
 	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_ODBC_VERSION, api.SQL_OV_ODBC3, 0)
@@ -100,7 +102,7 @@ func (d *Driver) open(name string, dialContext context.Context) (driver.Conn, er
 		return nil, NewError("SQLAllocHandle", d.h)
 	}
 	h := api.SQLHDBC(out)
-	drv.Stats.updateHandleCount(api.SQL_HANDLE_DBC, 1)
+	drv.Stats.ConnCount.Inc()
 
 	b := api.StringToUTF16(name)
 	ret = api.SQLDriverConnect(h, 0,

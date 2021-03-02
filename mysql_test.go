@@ -19,7 +19,7 @@ var (
 	mypass = flag.String("mypass", "", "mysql password")
 )
 
-func mysqlConnect() (db *sql.DB, stmtCount int, err error) {
+func mysqlConnect() (db *sql.DB, stmtCount int32, err error) {
 	// from https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-configuration-connection-parameters.html
 	conn := fmt.Sprintf("driver=mysql;server=%s;database=%s;user=%s;password=%s;",
 		*mysrv, *mydb, *myuser, *mypass)
@@ -28,7 +28,7 @@ func mysqlConnect() (db *sql.DB, stmtCount int, err error) {
 		return nil, 0, err
 	}
 	stats := db.Driver().(*Driver).Stats
-	return db, stats.StmtCount, nil
+	return db, stats.StmtCount.Load(), nil
 }
 
 func TestMYSQLTime(t *testing.T) {
