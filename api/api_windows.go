@@ -119,7 +119,7 @@ const (
 	//Access Mode
 	SQL_ATTR_ACCESS_MODE = 101
 	SQL_MODE_READ_ONLY   = 1
-	SQL_MODE_READ_WRITE  = O
+	SQL_MODE_READ_WRITE  = 0
 )
 
 type (
