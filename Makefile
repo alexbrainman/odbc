@@ -29,15 +29,14 @@ stop-mssql:
 # MySQL
 
 MYSQL_CONTAINER_NAME=mysql_test
-MYSQL_ROOT_PASSWORD=$(PASSWORD)
 
 start-mysql:
-	docker run --name=$(MYSQL_CONTAINER_NAME) -e 'MYSQL_ROOT_PASSWORD=$(MYSQL_ROOT_PASSWORD)' -d -p 127.0.0.1:3306:3306 mysql
-	echo -n "starting $(MYSQL_CONTAINER_NAME) "; while ! docker logs $(MYSQL_CONTAINER_NAME) 2>&1 | grep ^Version.*port:.3306 >/dev/null ; do echo -n .; sleep 1; done; echo " done"
-	docker exec $(MYSQL_CONTAINER_NAME) sh -c 'echo "create database $(DB_NAME)" | MYSQL_PWD=$(MYSQL_ROOT_PASSWORD) mysql -hlocalhost -uroot'
+	docker run --name=$(MYSQL_CONTAINER_NAME) -e 'MYSQL_ALLOW_EMPTY_PASSWORD=yes' -e 'MYSQL_ROOT_HOST=%' -d -p 127.0.0.1:3306:3306 mysql/mysql-server:8.0
+	echo -n "starting $(MYSQL_CONTAINER_NAME) "; while ! docker logs $(MYSQL_CONTAINER_NAME) 2>&1 | grep ready.for.connections >/dev/null ; do echo -n .; sleep 1; done; echo " done"
+	docker exec $(MYSQL_CONTAINER_NAME) sh -c 'echo "create database $(DB_NAME)" | mysql -hlocalhost -uroot'
 
 test-mysql:
-	go test -v -mydb=$(DB_NAME) -mypass=$(MYSQL_ROOT_PASSWORD) -mysrv=127.0.0.1 -myuser=root -run=MYSQL
+	go test -v -mydb=$(DB_NAME) -mysrv=127.0.0.1 -myuser=root -run=MYSQL
 
 stop-mysql:
 	docker stop $(MYSQL_CONTAINER_NAME)
