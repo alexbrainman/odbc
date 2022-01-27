@@ -147,7 +147,7 @@ func (c *BaseColumn) DatabaseTypeName() string {
 	case api.SQL_FLOAT:
 		return "FLOAT"
 	case api.SQL_REAL:
-		return "READ"
+		return "REAL"
 	case api.SQL_DOUBLE:
 		return "DOUBLE"
 	case api.SQL_DATETIME:
