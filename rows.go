@@ -64,3 +64,8 @@ func (r *Rows) NextResultSet() error {
 	}
 	return nil
 }
+
+func (rs *Rows) ColumnTypeDatabaseTypeName(i int) string {
+	return rs.os.Cols[i].DatabaseTypeName()
+
+}
