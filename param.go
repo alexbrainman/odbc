@@ -10,7 +10,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/hawkaa/odbc/api"
+	"github.com/duneanalytics/odbc/api"
 )
 
 type Parameter struct {

@@ -8,7 +8,7 @@ import (
 	"database/sql/driver"
 	"io"
 
-	"github.com/hawkaa/odbc/api"
+	"github.com/duneanalytics/odbc/api"
 )
 
 type Rows struct {

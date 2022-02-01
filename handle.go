@@ -7,7 +7,7 @@ package odbc
 import (
 	"fmt"
 
-	"github.com/hawkaa/odbc/api"
+	"github.com/duneanalytics/odbc/api"
 )
 
 func ToHandleAndType(handle interface{}) (h api.SQLHANDLE, ht api.SQLSMALLINT, err error) {

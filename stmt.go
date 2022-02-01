@@ -9,7 +9,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/hawkaa/odbc/api"
+	"github.com/duneanalytics/odbc/api"
 )
 
 type Stmt struct {

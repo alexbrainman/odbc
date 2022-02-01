@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/hawkaa/odbc"
+	_ "github.com/duneanalytics/odbc"
 )
 
 var (

@@ -1,4 +1,4 @@
-module github.com/hawkaa/odbc
+module github.com/duneanalytics/odbc
 
 go 1.17
 
