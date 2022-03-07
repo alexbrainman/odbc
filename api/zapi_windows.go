@@ -42,6 +42,7 @@ var (
 	procSQLAllocHandle     = mododbc32.NewProc("SQLAllocHandle")
 	procSQLBindCol         = mododbc32.NewProc("SQLBindCol")
 	procSQLBindParameter   = mododbc32.NewProc("SQLBindParameter")
+	procSQLCancel          = mododbc32.NewProc("SQLCancel")
 	procSQLCloseCursor     = mododbc32.NewProc("SQLCloseCursor")
 	procSQLDescribeColW    = mododbc32.NewProc("SQLDescribeColW")
 	procSQLDescribeParam   = mododbc32.NewProc("SQLDescribeParam")
@@ -76,6 +77,12 @@ func SQLBindCol(statementHandle SQLHSTMT, columnNumber SQLUSMALLINT, targetType 
 
 func SQLBindParameter(statementHandle SQLHSTMT, parameterNumber SQLUSMALLINT, inputOutputType SQLSMALLINT, valueType SQLSMALLINT, parameterType SQLSMALLINT, columnSize SQLULEN, decimalDigits SQLSMALLINT, parameterValue SQLPOINTER, bufferLength SQLLEN, ind *SQLLEN) (ret SQLRETURN) {
 	r0, _, _ := syscall.Syscall12(procSQLBindParameter.Addr(), 10, uintptr(statementHandle), uintptr(parameterNumber), uintptr(inputOutputType), uintptr(valueType), uintptr(parameterType), uintptr(columnSize), uintptr(decimalDigits), uintptr(parameterValue), uintptr(bufferLength), uintptr(unsafe.Pointer(ind)), 0, 0)
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLCancel(statementHandle SQLHSTMT) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall(procSQLCancel.Addr(), 1, uintptr(statementHandle), 0, 0)
 	ret = SQLRETURN(r0)
 	return
 }
