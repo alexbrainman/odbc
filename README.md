@@ -11,6 +11,9 @@ our issues in detail.
 
 In this fork, we modify some of the column binding operations to work more nicely with Spark.
 
+We also implement the [`driver.QueryerContext`](https://pkg.go.dev/database/sql/driver#QueryerContext)
+which honours the context passed in, and returns when the context times out or gets cancelled.
+
 ## Original `README.md`
 
 odbc driver written in go. Implements database driver interface as used by standard database/sql package. It calls into odbc dll on Windows, and uses cgo (unixODBC) everywhere else.
