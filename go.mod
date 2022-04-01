@@ -1,8 +1,8 @@
 module github.com/alexbrainman/odbc
 
-go 1.17
+go 1.18
 
 require (
-	github.com/go-ole/go-ole v1.2.5
-	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
+	github.com/go-ole/go-ole v1.2.6
+	golang.org/x/sys v0.0.0-20220330033206-e17cdc41300f
 )
