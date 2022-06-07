@@ -1917,3 +1917,85 @@ IF @@ROWCOUNT = 0
 		t.Fatal(err)
 	}
 }
+
+// https://github.com/alexbrainman/odbc/issues/178
+// [WARN] this test will drop database named test
+func TestMSSQLIssue178(t *testing.T) {
+	db, _, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// not checking resources usage here, because these are
+		// unpredictable due to use of goroutines.
+		err := db.Close()
+		if err != nil {
+			t.Fatalf("error closing DB: %v", err)
+		}
+	}()
+
+	func() {
+		type testStruct struct {
+			collate string
+			poem    string
+		}
+
+		testCases := []testStruct{
+			{
+				collate: "Chinese_Taiwan_Bopomofo_CI_AS",
+				poem:    "花間一壺酒，獨酌無相親。",
+			},
+			{
+				collate: "Chinese_PRC_90_CI_AS",
+				poem:    "花间一壶酒，独酌无相亲。",
+			},
+			{
+				collate: "Japanese_CI_AS",
+				poem:    "月日は百代の過客にして、行かふ年も又旅人也",
+			},
+			{
+				collate: "Korean_Wansung_CI_AS",
+				poem:    "꽃 사이 놓인 한 동이 술을 친한 이 없이 혼자 마시네.",
+			},
+		}
+
+		db.Exec("use master")
+		db.Exec("drop database test")
+		for _, testCase := range testCases {
+			func() {
+				db.Exec("create database test collate " + testCase.collate)
+				db.Exec("use test")
+				db.Exec("create table dbo.temp (poem varchar(100))")
+
+				defer func() {
+					db.Exec("use master")
+					db.Exec("drop database test")
+				}()
+
+				// insert poem of test case
+				s, err := db.Prepare("insert into dbo.temp (poem) values (?)")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer s.Close()
+
+				_, err = s.Exec(testCase.poem)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// query inserted poem and compare with testCase.poem
+				var rowPoem string
+				if err = db.QueryRow(
+					"select cast(poem as nvarchar(max)) from dbo.temp",
+				).Scan(&rowPoem); err != nil {
+					t.Fatalf("Scan: %v", err)
+				}
+
+				if same := testCase.poem == rowPoem; !same {
+					t.Fatalf("poem missmatch, want=%v, got=%v", testCase.poem, rowPoem)
+				}
+			}()
+		}
+	}()
+}
