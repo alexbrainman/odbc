@@ -7,14 +7,32 @@ help:
 
 # Microsoft SQL Server
 
-MSSQL_DB_FILES=/tmp/mssql_temp
 MSSQL_CONTAINER_NAME=mssql_test
 MSSQL_SA_PASSWORD=$(PASSWORD)
 
 start-mssql:
-	docker run --name=$(MSSQL_CONTAINER_NAME) -e 'ACCEPT_EULA=Y' -e 'MSSQL_SA_PASSWORD=$(MSSQL_SA_PASSWORD)' -e 'MSSQL_PID=Developer' --cap-add SYS_PTRACE -v $(MSSQL_DB_FILES):/var/opt/mssql -d -p 1433:1433 microsoft/mssql-server-linux
-	echo -n "starting $(MSSQL_CONTAINER_NAME) "; while ! docker logs $(MSSQL_CONTAINER_NAME) 2>&1 | grep SQL.Server.is.now.ready.for.client.connections >/dev/null ; do echo -n .; sleep 1; done; echo " done"
-	docker exec $(MSSQL_CONTAINER_NAME) /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P '$(MSSQL_SA_PASSWORD)' -Q 'create database $(DB_NAME)'
+	docker run \
+		--name $(MSSQL_CONTAINER_NAME) \
+		--hostname $(MSSQL_CONTAINER_NAME) \
+		-e 'ACCEPT_EULA=Y' \
+		-e 'MSSQL_SA_PASSWORD=$(MSSQL_SA_PASSWORD)' \
+		-d \
+		-p 1433:1433 \
+		mcr.microsoft.com/mssql/server:2022-latest
+	echo -n "starting $(MSSQL_CONTAINER_NAME) "; \
+		while ! \
+			docker logs $(MSSQL_CONTAINER_NAME) 2>&1 | \
+			grep SQL.Server.is.now.ready.for.client.connections >/dev/null ; \
+		do echo -n .; sleep 2; done; echo " done"
+	echo -n "creating database $(DB_NAME) "; \
+		while ! \
+			docker exec $(MSSQL_CONTAINER_NAME) \
+				/opt/mssql-tools/bin/sqlcmd \
+				-S localhost \
+				-U SA \
+				-P '$(MSSQL_SA_PASSWORD)' \
+				-Q 'create database $(DB_NAME)' >/dev/null 2>&1 ; \
+		do echo -n .; sleep 2; done; echo " done"
 
 test-mssql:
 	go test -v -mssrv=localhost -msdb=$(DB_NAME) -msuser=sa -mspass=$(MSSQL_SA_PASSWORD) -run=TestMSSQL
