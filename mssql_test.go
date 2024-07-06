@@ -6,6 +6,7 @@ package odbc
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -1915,5 +1916,55 @@ IF @@ROWCOUNT = 0
 
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMSSQLQueryContextTimeout(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	contextTimeout := time.Millisecond * 500
+	queryWaitFor := time.Second * 1
+
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	defer cancel()
+
+	start := time.Now()
+	_, err = db.QueryContext(ctx, "WAITFOR DELAY '00:01';")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("Unexpected success, expected error")
+	}
+	if err != context.DeadlineExceeded {
+		t.Fatalf("Unexpected error value: should=%s, is=%s", context.DeadlineExceeded, err)
+	}
+	if elapsed > queryWaitFor {
+		t.Fatalf("Unexpected query duration: should=>%s, is=%s", queryWaitFor, elapsed)
+	}
+	if elapsed < contextTimeout {
+		t.Fatalf("Query did not delay: should=<%s, is=%s", contextTimeout, elapsed)
+	}
+}
+func TestMSSQLQueryContextCancel(t *testing.T) {
+	db, sc, err := mssqlConnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeDB(t, db, sc, sc)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cancel()
+	_, err = db.QueryContext(ctx, "WAITFOR DELAY '00:01';")
+
+	if err == nil {
+		t.Fatal("Unexpected success, expected error")
+	}
+	if err != context.Canceled {
+		t.Fatalf("Unexpected error value: should=%s, is=%s", context.Canceled, err)
 	}
 }
