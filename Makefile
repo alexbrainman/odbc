@@ -9,8 +9,11 @@ help:
 
 MSSQL_CONTAINER_NAME=mssql_test
 MSSQL_SA_PASSWORD=$(PASSWORD)
+MSSQL_NETWORK=mssqlnetwork
+MSSQL_DRIVER_NAME=ODBC Driver 17 for SQL Server
 
 start-mssql:
+	docker network create ${MSSQL_NETWORK}
 	docker run \
 		--name $(MSSQL_CONTAINER_NAME) \
 		--hostname $(MSSQL_CONTAINER_NAME) \
@@ -18,6 +21,7 @@ start-mssql:
 		-e 'MSSQL_SA_PASSWORD=$(MSSQL_SA_PASSWORD)' \
 		-d \
 		-p 1433:1433 \
+		--network=${MSSQL_NETWORK} \
 		mcr.microsoft.com/mssql/server:2022-latest
 	echo -n "starting $(MSSQL_CONTAINER_NAME) "; \
 		while ! \
@@ -34,15 +38,54 @@ start-mssql:
 				-Q 'create database $(DB_NAME)' >/dev/null 2>&1 ; \
 		do echo -n .; sleep 2; done; echo " done"
 
+build-unixodbc:
+	docker build \
+		-t unixodbc \
+		-f unixodbc.Dockerfile \
+		.
+
 test-mssql:
-	go test -v -mssrv=localhost -msdb=$(DB_NAME) -msuser=sa -mspass=$(MSSQL_SA_PASSWORD) -run=TestMSSQL
+	docker run \
+		-it \
+		--network=${MSSQL_NETWORK} \
+		-v .:/src \
+		unixodbc \
+			sh /src/mssqltest.sh \
+				"$(MSSQL_DRIVER_NAME)" \
+				"$(MSSQL_CONTAINER_NAME)" \
+				"$(DB_NAME)" \
+				"$(MSSQL_SA_PASSWORD)"
+
+test-mssql-freetds:
+	docker run \
+		-it \
+		--network=${MSSQL_NETWORK} \
+		-v .:/src \
+		unixodbc \
+			sh /src/mssqltest.sh \
+				"freetds" \
+				"$(MSSQL_CONTAINER_NAME)" \
+				"$(DB_NAME)" \
+				"$(MSSQL_SA_PASSWORD)"
+
 
 test-mssql-race:
-	go test -v -mssrv=localhost -msdb=$(DB_NAME) -msuser=sa -mspass=$(MSSQL_SA_PASSWORD) -run=TestMSSQL --race
+	docker run \
+		-it \
+		--network=${MSSQL_NETWORK} \
+		-v .:/src \
+		unixodbc \
+			sh /src/mssqltest.sh \
+				"$(MSSQL_DRIVER_NAME)" \
+				"$(MSSQL_CONTAINER_NAME)" \
+				"$(DB_NAME)" \
+				"$(MSSQL_SA_PASSWORD)" \
+				"--race"
 
 stop-mssql:
 	docker stop $(MSSQL_CONTAINER_NAME)
 	docker rm $(MSSQL_CONTAINER_NAME)
+	docker network rm ${MSSQL_NETWORK}
 
 # MySQL
 
