@@ -17,7 +17,7 @@ import (
 type BufferLen api.SQLLEN
 
 func (l *BufferLen) IsNull() bool {
-	return *l == api.SQL_NULL_DATA
+	return *l == api.SQL_NULL_DATA || (*l>>32 == 0 && int32(*l) == api.SQL_NULL_DATA)
 }
 
 func (l *BufferLen) GetData(h api.SQLHSTMT, idx int, ctype api.SQLSMALLINT, buf []byte) api.SQLRETURN {
