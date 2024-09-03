@@ -158,3 +158,12 @@ func (s *ODBCStmt) BindColumns() error {
 	}
 	return nil
 }
+
+func (s *ODBCStmt) Cancel() error {
+	ret := api.SQLCancel(s.h)
+	if IsError(ret) {
+		return NewError("SQLCancel", s.h)
+	}
+
+	return nil
+}
