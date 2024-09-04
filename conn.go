@@ -101,7 +101,7 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, ctx.Err()
 	}
 
-	go c.wrapQuery(ctx, os, dargs, rowsChan, errorChan)
+	go c.wrapQuery(os, dargs, rowsChan, errorChan)
 
 	var finalErr error
 	var finalRes driver.Rows
@@ -133,7 +133,7 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 
 // wrapQuery is following the same logic as `stmt.Query()` except that we don't use a lock
 // because the ODBC statement doesn't get exposed externally.
-func (c *Conn) wrapQuery(ctx context.Context, os *ODBCStmt, dargs []driver.Value, rowsChan chan<- driver.Rows, errorChan chan<- error) {
+func (c *Conn) wrapQuery(os *ODBCStmt, dargs []driver.Value, rowsChan chan<- driver.Rows, errorChan chan<- error) {
 	if err := os.Exec(dargs, c); err != nil {
 		errorChan <- err
 		return
@@ -146,12 +146,6 @@ func (c *Conn) wrapQuery(ctx context.Context, os *ODBCStmt, dargs []driver.Value
 
 	os.usedByRows = true
 	rowsChan <- &Rows{os: os}
-
-	// At the end of the execution, we check if the context has been cancelled
-	// to ensure the caller doesn't end up waiting for a message indefinitely (L119)
-	if ctx.Err() != nil {
-		errorChan <- ctx.Err()
-	}
 }
 
 // namedValueToValue is a utility function that converts a driver.NamedValue into a driver.Value.
