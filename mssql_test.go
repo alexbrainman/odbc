@@ -672,6 +672,10 @@ var typeMSSpecificTests = []typeTest{
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(5))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as nvarchar(max))", match([]byte("\u0421\u0430\u0448\u0430"))},
 	{"select cast(N'\u0421\u0430\u0448\u0430' as ntext)", match([]byte("\u0421\u0430\u0448\u0430"))},
+	{"select cast(N'Саша' as nvarchar(max))", match([]byte("Саша"))},
+	{"select cast(N'你好世界' as nvarchar(21))", match([]byte("你好世界"))},
+	{"select cast(N'Γεια σου κόσμε' as nvarchar(21))", match([]byte("Γεια σου κόσμε"))},
+	{"select cast(N'Hello, 世界' as nvarchar(max))", match([]byte("Hello, 世界"))},
 }
 
 var typeMSSQL2008Tests = []typeTest{
@@ -1257,6 +1261,12 @@ var paramTypeTests = []struct {
 	{"4001 large string value", "text", strings.Repeat("a", 4001)},
 	{"4001 large unicode string value", "ntext", strings.Repeat("\u0421", 4001)},
 	{"very large string value", "text", strings.Repeat("a", 10000)},
+	{"unicode with russian letters", "nvarchar(10)", "\u0421\u0430\u0448\u0430"},
+	{"unicode with russian letters", "nvarchar(max)", "\u0421\u0430\u0448\u0430"},
+	{"unicode with russian letters", "ntext", "Саша"},
+	{"unicode with chinese letters", "nvarchar(max)", "Hello, 世界"},
+	{"unicode with chinese letters", "nvarchar(21)", "你好世界"},
+	{"unicode with greek letters", "nvarchar(21)", "Γεια σου κόσμε"},
 	// datetime
 	{"datetime overflow", "datetime", time.Date(2013, 9, 9, 14, 07, 15, 123e6, time.Local)},
 	// binary blobs
