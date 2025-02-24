@@ -290,8 +290,17 @@ loop:
 			break loop
 		case api.SQL_SUCCESS_WITH_INFO:
 			err := NewError("SQLGetData", h).(*Error)
-			if len(err.Diag) > 0 && err.Diag[0].State != "01004" {
-				return nil, err
+			if len(err.Diag) > 0 {
+				truncated := false
+				for _, diag := range err.Diag {
+					if diag.State == "01004" {
+						truncated = true
+						break
+					}
+				}
+				if !truncated {
+					return nil, err
+				}
 			}
 			i := len(b)
 			switch c.CType {
