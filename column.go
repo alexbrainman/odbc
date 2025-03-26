@@ -35,6 +35,7 @@ func (l *BufferLen) Bind(h api.SQLHSTMT, idx int, ctype api.SQLSMALLINT, buf []b
 // Column provides access to row columns.
 type Column interface {
 	Name() string
+	DatabaseTypeName() string
 	Bind(h api.SQLHSTMT, idx int) (bool, error)
 	Value(h api.SQLHSTMT, idx int) (driver.Value, error)
 }
@@ -119,6 +120,71 @@ type BaseColumn struct {
 
 func (c *BaseColumn) Name() string {
 	return c.name
+}
+
+func (c *BaseColumn) DatabaseTypeName() string {
+	switch c.SQLType {
+	case api.SQL_CHAR:
+		return "CHAR"
+	case api.SQL_NUMERIC:
+		return "NUMERIC"
+	case api.SQL_DECIMAL:
+		return "DECIMAL"
+	case api.SQL_INTEGER:
+		return "INTEGER"
+	case api.SQL_SMALLINT:
+		return "SMALLINT"
+	case api.SQL_FLOAT:
+		return "FLOAT"
+	case api.SQL_REAL:
+		return "REAL"
+	case api.SQL_DOUBLE:
+		return "DOUBLE"
+	case api.SQL_DATETIME:
+		return "DATETIME"
+	case api.SQL_TIME:
+		return "TIME"
+	case api.SQL_VARCHAR:
+		return "VARCHAR"
+	case api.SQL_TYPE_DATE:
+		return "TYPE_DATE"
+	case api.SQL_TYPE_TIME:
+		return "TYPE_TIME"
+	case api.SQL_TYPE_TIMESTAMP:
+		return "TYPE_TIMESTAMP"
+	case api.SQL_TIMESTAMP:
+		return "TIMESTAMP"
+	case api.SQL_LONGVARCHAR:
+		return "LONGVARCHAR"
+	case api.SQL_BINARY:
+		return "BINARY"
+	case api.SQL_VARBINARY:
+		return "VARBINARY"
+	case api.SQL_LONGVARBINARY:
+		return "LONGVARBINARY"
+	case api.SQL_BIGINT:
+		return "BIGINT"
+	case api.SQL_TINYINT:
+		return "TINYINT"
+	case api.SQL_BIT:
+		return "BIT"
+	case api.SQL_WCHAR:
+		return "WCHAR"
+	case api.SQL_WVARCHAR:
+		return "WVARCHAR"
+	case api.SQL_WLONGVARCHAR:
+		return "WLONGVARCHAR"
+	case api.SQL_GUID:
+		return "GUID"
+	case api.SQL_SIGNED_OFFSET:
+		return "SIGNED_OFFSET"
+	case api.SQL_UNSIGNED_OFFSET:
+		return "UNSIGNED_OFFSET"
+	case api.SQL_UNKNOWN_TYPE:
+		return ""
+	default:
+		return ""
+	}
 }
 
 func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
