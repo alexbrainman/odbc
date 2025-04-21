@@ -144,7 +144,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 		p.Data = b
 		if len(d) > 0 {
 			buf = unsafe.Pointer(&b[0])
-		} 
+		}
 		buflen = api.SQLLEN(len(b))
 		plen = p.StoreStrLen_or_IndPtr(buflen)
 		size = api.SQLULEN(len(b))
