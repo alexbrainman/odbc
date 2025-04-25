@@ -79,78 +79,70 @@ func (c *Conn) newError(apiName string, handle interface{}) error {
 // As per the specifications, it honours the context timeout and returns when the context is cancelled.
 // When the context is cancelled, it first cancels the statement, closes it, and then returns an error.
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	// Prepare a query
-	os, err := c.PrepareODBCStmt(query)
-	if err != nil {
-		return nil, err
-	}
-
+	// prepare the statement
 	dargs, err := namedValueToValue(args)
 	if err != nil {
 		return nil, err
 	}
+	os, err := c.PrepareODBCStmt(query)
+	if err != nil {
+		return nil, err
+	}
+	defer os.closeByStmt()
 
-	// Execute the statement
-	rowsChan := make(chan driver.Rows)
-	defer close(rowsChan)
-	errorChan := make(chan error)
-	defer close(errorChan)
-
+	// check if context is canceled before executing the query
 	if ctx.Err() != nil {
-		os.closeByStmt()
 		return nil, ctx.Err()
 	}
 
-	go c.wrapQuery(ctx, os, dargs, rowsChan, errorChan)
-
-	var finalErr error
-	var finalRes driver.Rows
-
-	select {
-	case <-ctx.Done():
-		// Context has been cancelled or has expired, cancel the statement
-		if err := os.Cancel(); err != nil {
-			finalErr = err
-			break
+	// execute the statement
+	rowsChan := make(chan driver.Rows)
+	errorChan := make(chan error)
+	go func() {
+		err := c.wrapQuery(ctx, os, dargs)
+		if err != nil {
+			errorChan <- err
+			return
 		}
-
-		// The statement has been cancelled, the query execution should eventually fail now.
-		// We wait for it in order to avoid having a dangling goroutine running in the background
-		<-errorChan
-		finalErr = ctx.Err()
-	case err := <-errorChan:
-		finalErr = err
-	case rows := <-rowsChan:
-		finalRes = rows
-	}
-
-	// Close the statement
-	os.closeByStmt()
-	os = nil
-
-	return finalRes, finalErr
+		os.usedByRows = true
+		rowsChan <- &Rows{os: os}
+	}()
+	return c.waitQuery(ctx, os, rowsChan, errorChan)
 }
 
 // wrapQuery is following the same logic as `stmt.Query()` except that we don't use a lock
 // because the ODBC statement doesn't get exposed externally.
-func (c *Conn) wrapQuery(ctx context.Context, os *ODBCStmt, dargs []driver.Value, rowsChan chan<- driver.Rows, errorChan chan<- error) {
+func (c *Conn) wrapQuery(ctx context.Context, os *ODBCStmt, dargs []driver.Value) error {
 	if err := os.Exec(dargs, c); err != nil {
-		errorChan <- err
-		return
+		return err
 	}
 
 	if err := os.BindColumns(); err != nil {
-		errorChan <- err
-		return
+		return err
 	}
+	return nil
+}
 
-	os.usedByRows = true
-	rowsChan <- &Rows{os: os}
-
-	// At the end of the execution, we check if the context has been cancelled
-	// to ensure the caller doesn't end up waiting for a message indefinitely (L119)
-	if ctx.Err() != nil {
-		errorChan <- ctx.Err()
+// waitQuery waits for either os rows or error to arrive from rowsChan and errorChan.
+// waitQuery also waits for ctx to signal completion.
+// The function returns received rows or the error.
+func (c *Conn) waitQuery(ctx context.Context, os *ODBCStmt, rowsChan <-chan driver.Rows, errorChan <-chan error) (driver.Rows, error) {
+	select {
+	case <-ctx.Done():
+		// context has been cancelled or has expired, cancel the statement and ignore the os.Cancel error
+		os.Cancel()
+		// the statement has been cancelled, the query execution should eventually succeed or fail now
+		select {
+		// ignore the ODBC error and return ctx.Err() instead
+		case <-errorChan:
+			return nil, ctx.Err()
+		case rows := <-rowsChan:
+			return rows, nil
+		}
+	case err := <-errorChan:
+		return nil, err
+	case rows := <-rowsChan:
+		return rows, nil
 	}
 }
 
