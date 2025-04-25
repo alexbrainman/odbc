@@ -144,22 +144,11 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 		p.Data = b
 		if len(d) > 0 {
 			buf = unsafe.Pointer(&b[0])
-		} else {
-			buf = nil
 		}
 		buflen = api.SQLLEN(len(b))
 		plen = p.StoreStrLen_or_IndPtr(buflen)
 		size = api.SQLULEN(len(b))
-		switch {
-		case p.isDescribed:
-			sqltype = p.SQLType
-		case size <= 0:
-			sqltype = api.SQL_LONGVARBINARY
-		case size >= 8000:
-			sqltype = api.SQL_LONGVARBINARY
-		default:
-			sqltype = api.SQL_BINARY
-		}
+		sqltype = api.SQL_LONGVARBINARY
 	default:
 		return fmt.Errorf("unsupported type %T", v)
 	}
