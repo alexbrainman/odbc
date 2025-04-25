@@ -129,15 +129,13 @@ func (c *Conn) wrapQuery(ctx context.Context, os *ODBCStmt, dargs []driver.Value
 func (c *Conn) waitQuery(ctx context.Context, os *ODBCStmt, rowsChan <-chan driver.Rows, errorChan <-chan error) (driver.Rows, error) {
 	select {
 	case <-ctx.Done():
-		// context has been cancelled or has expired, cancel the statement
-		if err := os.Cancel(); err != nil {
-			return nil, err
-		}
+		// context has been cancelled or has expired, cancel the statement and ignore the os.Cancel error
+		os.Cancel()
 		// the statement has been cancelled, the query execution should eventually succeed or fail now
 		select {
-		// ignore the error and return context.DeadlineExceeded instead
+		// ignore the ODBC error and return ctx.Err() instead
 		case <-errorChan:
-			return nil, context.DeadlineExceeded
+			return nil, ctx.Err()
 		case rows := <-rowsChan:
 			return rows, nil
 		}
