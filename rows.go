@@ -64,3 +64,17 @@ func (r *Rows) NextResultSet() error {
 	}
 	return nil
 }
+
+// Implement RowsColumnTypeDatabaseTypeName interface in order to return column types.
+// https://github.com/golang/go/blob/e22a14b7eb1e4a172d0c20d14a0d2433fdf20e5c/src/database/sql/driver/driver.go#L469-L477
+//
+// From the docs:
+// RowsColumnTypeDatabaseTypeName may be implemented by Rows. It should return the
+// database system type name without the length. Type names should be uppercase.
+// Examples of returned types: "VARCHAR", "NVARCHAR", "VARCHAR2", "CHAR", "TEXT",
+// "DECIMAL", "SMALLINT", "INT", "BIGINT", "BOOL", "[]BIGINT", "JSONB", "XML",
+// "TIMESTAMP".
+func (rs *Rows) ColumnTypeDatabaseTypeName(i int) string {
+	return rs.os.Cols[i].DatabaseTypeName()
+
+}
