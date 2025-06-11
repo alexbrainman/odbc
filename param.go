@@ -80,6 +80,9 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 			// https://docs.microsoft.com/en-us/sql/odbc/microsoft/microsoft-access-data-types
 			sqltype = api.SQL_WLONGVARCHAR
 		}
+		if p.isDescribed && p.Size > 0 {
+			size = p.Size
+		}
 	case int64:
 		if -0x80000000 < d && d < 0x7fffffff {
 			// Some ODBC drivers do not support SQL_BIGINT.
@@ -159,6 +162,9 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 			sqltype = api.SQL_LONGVARBINARY
 		default:
 			sqltype = api.SQL_BINARY
+		}
+		if p.isDescribed && p.Size > 0 {
+			size = p.Size
 		}
 	default:
 		return fmt.Errorf("unsupported type %T", v)

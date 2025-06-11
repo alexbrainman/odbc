@@ -620,6 +620,8 @@ var typeTests = []typeTest{
 	{"select cast('abcde' as nvarchar(3))", match([]byte("abc"))},
 	{"select cast('' as nvarchar(5))", match([]byte(""))},
 	{"select cast(NULL as nvarchar(5))", match(nil)},
+	{"select cast('你好世界' as varchar(21))", match([]byte("你好世界"))},
+	{"select cast('Γεια σου κόσμε' as varchar(21))", match([]byte("Γεια σου κόσμε"))},
 
 	// datetime, smalldatetime
 	{"select cast('20151225' as datetime)", match(time.Date(2015, 12, 25, 0, 0, 0, 0, time.Local))},
