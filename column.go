@@ -256,6 +256,9 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 	if !c.IsVariableWidth && int(c.Len) != c.Size {
 		return nil, fmt.Errorf("wrong column #%d length %d returned, %d expected", idx, c.Len, c.Size)
 	}
+	if len(c.Buffer) < int(c.Len) {
+		return c.BaseColumn.Value(c.Buffer)
+	}
 	return c.BaseColumn.Value(c.Buffer[:c.Len])
 }
 
