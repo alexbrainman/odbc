@@ -13,6 +13,15 @@ import (
 
 var drv Driver
 
+// PoolingType controls ODBC-level connection pooling.
+// Set this BEFORE any sql.Open call (typically in your own init()).
+//
+// Recommended: Leave as SQL_CP_OFF (default) and rely on Go's
+// database/sql pool, which is goroutine-safe and well-tested.
+// ODBC-level pooling (SQL_CP_ONE_PER_HENV) can cause thread-safety
+// issues with unixODBC <= 2.3.9.
+var PoolingType = api.SQL_CP_OFF
+
 type Driver struct {
 	Stats
 	h       api.SQLHENV // environment handle
@@ -41,19 +50,20 @@ func initDriver() error {
 		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
 	}
 
-	//TODO: find a way to make this attribute changeable at runtime
-	//Enable connection pooling
-	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CONNECTION_POOLING, api.SQL_CP_ONE_PER_HENV, api.SQL_IS_UINTEGER)
-	if IsError(ret) {
-		defer releaseHandle(drv.h)
-		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
-	}
+	// Connection pooling: configurable via the exported PoolingType var.
+	// Default is SQL_CP_OFF to avoid double-pooling with Go's sql.DB.
+	if PoolingType != api.SQL_CP_OFF {
+		ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CONNECTION_POOLING, PoolingType, api.SQL_IS_UINTEGER)
+		if IsError(ret) {
+			defer releaseHandle(drv.h)
+			return NewError("SQLSetEnvUIntPtrAttr", drv.h)
+		}
 
-	//Set relaxed connection pool matching
-	ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CP_MATCH, api.SQL_CP_RELAXED_MATCH, api.SQL_IS_UINTEGER)
-	if IsError(ret) {
-		defer releaseHandle(drv.h)
-		return NewError("SQLSetEnvUIntPtrAttr", drv.h)
+		ret = api.SQLSetEnvUIntPtrAttr(drv.h, api.SQL_ATTR_CP_MATCH, api.SQL_CP_RELAXED_MATCH, api.SQL_IS_UINTEGER)
+		if IsError(ret) {
+			defer releaseHandle(drv.h)
+			return NewError("SQLSetEnvUIntPtrAttr", drv.h)
+		}
 	}
 
 	//TODO: it would be nice if we could call "drv.SetMaxIdleConns(0)" here but from the docs it looks like

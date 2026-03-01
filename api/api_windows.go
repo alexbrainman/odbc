@@ -70,6 +70,27 @@ const (
 	SQL_SS_XML          = -152
 	SQL_SS_TIME2        = -154
 
+	// Informix vendor-specific ODBC type codes.
+	SQL_INFX_UDT_FIXED      = -100
+	SQL_INFX_UDT_VARYING    = -101
+	SQL_INFX_UDT_BLOB       = -102
+	SQL_INFX_UDT_CLOB       = -103
+	SQL_INFX_BIGINT         = -114
+	SQL_INFX_LVARCHAR       = -111
+	SQL_INFX_BOOLEAN        = 41
+	SQL_INFX_INT8           = -114
+	SQL_INFX_SERIAL8        = -114
+
+	SQL_DESC_TYPE_NAME = 14 // sqlext.h value
+
+	SQL_ATTR_CONNECTION_DEAD = 1209
+	SQL_CD_TRUE              = 1
+	SQL_CD_FALSE             = 0
+
+	SQL_DBMS_NAME   = 17
+	SQL_DBMS_VER    = 18
+	SQL_DRIVER_NAME = 6
+
 	SQL_C_CHAR           = SQL_CHAR
 	SQL_C_LONG           = SQL_INTEGER
 	SQL_C_SHORT          = SQL_SMALLINT
@@ -87,6 +108,9 @@ const (
 	SQL_C_SBIGINT        = SQL_BIGINT + SQL_SIGNED_OFFSET
 	SQL_C_UBIGINT        = SQL_BIGINT + SQL_UNSIGNED_OFFSET
 	SQL_C_GUID           = SQL_GUID
+
+	SQL_C_TYPE_DATE = SQL_TYPE_DATE
+	SQL_C_TYPE_TIME = SQL_TYPE_TIME
 
 	SQL_COMMIT   = 0
 	SQL_ROLLBACK = 1

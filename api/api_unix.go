@@ -89,6 +89,34 @@ const (
 	SQL_SS_XML   = -152
 	SQL_SS_TIME2 = -154
 
+	// Informix vendor-specific ODBC type codes.
+	// The IBM Informix CSDK ODBC driver returns these instead of standard
+	// ODBC types for certain Informix-native column types.
+	// Reference: IBM Informix ODBC Driver Programmer's Manual, Appendix A.
+	SQL_INFX_UDT_FIXED      = -100 // Fixed-length UDT (DATETIME, fixed opaque types)
+	SQL_INFX_UDT_VARYING    = -101 // Variable-length UDT (INTERVAL types)
+	SQL_INFX_UDT_BLOB       = -102 // BLOB (binary large object)
+	SQL_INFX_UDT_CLOB       = -103 // CLOB (character large object)
+	SQL_INFX_BIGINT         = -114 // INT8 / BIGINT
+	SQL_INFX_LVARCHAR       = -111 // LVARCHAR (long varchar without size limit)
+	SQL_INFX_BOOLEAN        = 41   // BOOLEAN (true/false/'t'/'f')
+	SQL_INFX_INT8           = -114 // Alias: same as SQL_INFX_BIGINT
+	SQL_INFX_SERIAL8        = -114 // Alias: SERIAL8 reports same code as INT8
+
+	// ODBC descriptor attribute for retrieving the type name string.
+	// Used with SQLColAttribute to disambiguate vendor type codes.
+	SQL_DESC_TYPE_NAME = C.SQL_DESC_TYPE_NAME
+
+	// Connection health attribute.
+	SQL_ATTR_CONNECTION_DEAD = 1209
+	SQL_CD_TRUE              = 1
+	SQL_CD_FALSE             = 0
+
+	// SQLGetInfo info types for DBMS identification.
+	SQL_DBMS_NAME    = 17
+	SQL_DBMS_VER     = 18
+	SQL_DRIVER_NAME  = 6
+
 	SQL_C_CHAR           = C.SQL_C_CHAR
 	SQL_C_LONG           = C.SQL_C_LONG
 	SQL_C_SHORT          = C.SQL_C_SHORT
@@ -106,6 +134,10 @@ const (
 	SQL_C_SBIGINT        = C.SQL_C_SBIGINT
 	SQL_C_UBIGINT        = C.SQL_C_UBIGINT
 	SQL_C_GUID           = C.SQL_C_GUID
+
+	// C types used by Informix driver for LOB streaming.
+	SQL_C_TYPE_DATE = C.SQL_C_TYPE_DATE
+	SQL_C_TYPE_TIME = C.SQL_C_TYPE_TIME
 
 	SQL_COMMIT   = C.SQL_COMMIT
 	SQL_ROLLBACK = C.SQL_ROLLBACK

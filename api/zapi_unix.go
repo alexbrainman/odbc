@@ -129,3 +129,18 @@ func SQLSetConnectAttr(connectionHandle SQLHDBC, attribute SQLINTEGER, valuePtr 
 	r := C.SQLSetConnectAttrW(C.SQLHDBC(connectionHandle), C.SQLINTEGER(attribute), C.SQLPOINTER(valuePtr), C.SQLINTEGER(stringLength))
 	return SQLRETURN(r)
 }
+
+func SQLColAttribute(statementHandle SQLHSTMT, columnNumber SQLUSMALLINT, fieldIdentifier SQLUSMALLINT, characterAttributePtr SQLPOINTER, bufferLength SQLSMALLINT, stringLengthPtr *SQLSMALLINT, numericAttributePtr *SQLLEN) (ret SQLRETURN) {
+	r := C.SQLColAttributeW(C.SQLHSTMT(statementHandle), C.SQLUSMALLINT(columnNumber), C.SQLUSMALLINT(fieldIdentifier), C.SQLPOINTER(characterAttributePtr), C.SQLSMALLINT(bufferLength), (*C.SQLSMALLINT)(stringLengthPtr), (*C.SQLLEN)(unsafe.Pointer(numericAttributePtr)))
+	return SQLRETURN(r)
+}
+
+func SQLGetConnectAttr(connectionHandle SQLHDBC, attribute SQLINTEGER, valuePtr SQLPOINTER, bufferLength SQLINTEGER, stringLengthPtr *SQLINTEGER) (ret SQLRETURN) {
+	r := C.SQLGetConnectAttrW(C.SQLHDBC(connectionHandle), C.SQLINTEGER(attribute), C.SQLPOINTER(valuePtr), C.SQLINTEGER(bufferLength), (*C.SQLINTEGER)(stringLengthPtr))
+	return SQLRETURN(r)
+}
+
+func SQLGetInfo(connectionHandle SQLHDBC, infoType SQLUSMALLINT, infoValuePtr SQLPOINTER, bufferLength SQLSMALLINT, stringLengthPtr *SQLSMALLINT) (ret SQLRETURN) {
+	r := C.SQLGetInfoW(C.SQLHDBC(connectionHandle), C.SQLUSMALLINT(infoType), C.SQLPOINTER(infoValuePtr), C.SQLSMALLINT(bufferLength), (*C.SQLSMALLINT)(stringLengthPtr))
+	return SQLRETURN(r)
+}

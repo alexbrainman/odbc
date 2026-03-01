@@ -61,6 +61,9 @@ var (
 	procSQLRowCount        = mododbc32.NewProc("SQLRowCount")
 	procSQLSetEnvAttr      = mododbc32.NewProc("SQLSetEnvAttr")
 	procSQLSetConnectAttrW = mododbc32.NewProc("SQLSetConnectAttrW")
+	procSQLColAttributeW   = mododbc32.NewProc("SQLColAttributeW")
+	procSQLGetConnectAttrW = mododbc32.NewProc("SQLGetConnectAttrW")
+	procSQLGetInfoW        = mododbc32.NewProc("SQLGetInfoW")
 )
 
 func SQLAllocHandle(handleType SQLSMALLINT, inputHandle SQLHANDLE, outputHandle *SQLHANDLE) (ret SQLRETURN) {
@@ -191,6 +194,24 @@ func SQLSetEnvAttr(environmentHandle SQLHENV, attribute SQLINTEGER, valuePtr SQL
 
 func SQLSetConnectAttr(connectionHandle SQLHDBC, attribute SQLINTEGER, valuePtr SQLPOINTER, stringLength SQLINTEGER) (ret SQLRETURN) {
 	r0, _, _ := syscall.Syscall6(procSQLSetConnectAttrW.Addr(), 4, uintptr(connectionHandle), uintptr(attribute), uintptr(valuePtr), uintptr(stringLength), 0, 0)
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLColAttribute(statementHandle SQLHSTMT, columnNumber SQLUSMALLINT, fieldIdentifier SQLUSMALLINT, characterAttributePtr SQLPOINTER, bufferLength SQLSMALLINT, stringLengthPtr *SQLSMALLINT, numericAttributePtr *SQLLEN) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall9(procSQLColAttributeW.Addr(), 7, uintptr(statementHandle), uintptr(columnNumber), uintptr(fieldIdentifier), uintptr(characterAttributePtr), uintptr(bufferLength), uintptr(unsafe.Pointer(stringLengthPtr)), uintptr(unsafe.Pointer(numericAttributePtr)), 0, 0)
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLGetConnectAttr(connectionHandle SQLHDBC, attribute SQLINTEGER, valuePtr SQLPOINTER, bufferLength SQLINTEGER, stringLengthPtr *SQLINTEGER) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall6(procSQLGetConnectAttrW.Addr(), 5, uintptr(connectionHandle), uintptr(attribute), uintptr(valuePtr), uintptr(bufferLength), uintptr(unsafe.Pointer(stringLengthPtr)), 0)
+	ret = SQLRETURN(r0)
+	return
+}
+
+func SQLGetInfo(connectionHandle SQLHDBC, infoType SQLUSMALLINT, infoValuePtr SQLPOINTER, bufferLength SQLSMALLINT, stringLengthPtr *SQLSMALLINT) (ret SQLRETURN) {
+	r0, _, _ := syscall.Syscall6(procSQLGetInfoW.Addr(), 5, uintptr(connectionHandle), uintptr(infoType), uintptr(infoValuePtr), uintptr(bufferLength), uintptr(unsafe.Pointer(stringLengthPtr)), 0)
 	ret = SQLRETURN(r0)
 	return
 }

@@ -85,12 +85,24 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 			// Some ODBC drivers do not support SQL_BIGINT.
 			// Use SQL_INTEGER if the value fit in int32.
 			// See issue #78 for details.
-			d2 := int32(d)
-			ctype = api.SQL_C_LONG
-			p.Data = &d2
-			buf = unsafe.Pointer(&d2)
-			sqltype = api.SQL_INTEGER
-			size = 4
+			//
+			// Exception: if the parameter was described as an Informix
+			// INT8 (vendor type -114), always use SQL_BIGINT to avoid
+			// type mismatch errors on INSERT/UPDATE.
+			if p.isDescribed && (p.SQLType == api.SQL_BIGINT || p.SQLType == api.SQL_INFX_BIGINT) {
+				ctype = api.SQL_C_SBIGINT
+				p.Data = &d
+				buf = unsafe.Pointer(&d)
+				sqltype = api.SQL_BIGINT
+				size = 8
+			} else {
+				d2 := int32(d)
+				ctype = api.SQL_C_LONG
+				p.Data = &d2
+				buf = unsafe.Pointer(&d2)
+				sqltype = api.SQL_INTEGER
+				size = 4
+			}
 		} else {
 			ctype = api.SQL_C_SBIGINT
 			p.Data = &d
@@ -128,9 +140,21 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 		}
 		p.Data = &b
 		buf = unsafe.Pointer(&b)
+		// Use standard SQL_TYPE_TIMESTAMP for the target SQL type,
+		// even if Informix described this parameter as vendor type -100.
+		// The Informix ODBC driver accepts SQL_TYPE_TIMESTAMP (93)
+		// for conversion into its native DATETIME storage.
 		sqltype = api.SQL_TYPE_TIMESTAMP
-		if p.isDescribed && p.SQLType == api.SQL_TYPE_TIMESTAMP {
-			decimal = p.Decimal
+		if p.isDescribed {
+			switch p.SQLType {
+			case api.SQL_TYPE_TIMESTAMP:
+				decimal = p.Decimal
+			case api.SQL_INFX_UDT_FIXED:
+				// Informix DATETIME described as vendor type -100.
+				// Keep sqltype as SQL_TYPE_TIMESTAMP for the conversion;
+				// Informix ODBC driver handles the mapping.
+				decimal = p.Decimal
+			}
 		}
 		if decimal <= 0 {
 			// represented as yyyy-mm-dd hh:mm:ss.fff format in ms sql server
@@ -207,6 +231,15 @@ func ExtractParameters(h api.SQLHSTMT) ([]Parameter, error) {
 			case api.SQL_WVARCHAR:
 				p.SQLType = api.SQL_WLONGVARCHAR
 			}
+		}
+		// Informix vendor type normalization for parameter binding.
+		// We keep the original vendor SQLType for reference in BindValue
+		// but note these mappings for the parameter description.
+		switch p.SQLType {
+		case api.SQL_INFX_BOOLEAN:
+			// Informix BOOLEAN → use SQL_BIT for binding.
+			p.SQLType = api.SQL_BIT
+			p.Size = 1
 		}
 	}
 	return ps, nil

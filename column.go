@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -50,6 +51,31 @@ func describeColumn(h api.SQLHSTMT, idx int, namebuf []uint16) (namelen int, sql
 
 // TODO(brainman): did not check for MS SQL timestamp
 
+// getColumnTypeName retrieves the data-source–specific type name for the
+// given column by calling SQLColAttribute with SQL_DESC_TYPE_NAME.
+// This is essential for Informix vendor type codes where the same numeric
+// code (e.g. -100) can represent different logical types (DATETIME vs
+// opaque UDT). Returns empty string on error.
+func getColumnTypeName(h api.SQLHSTMT, idx int) string {
+	buf := make([]uint16, 128)
+	var strLen api.SQLSMALLINT
+	ret := api.SQLColAttribute(h, api.SQLUSMALLINT(idx+1),
+		api.SQL_DESC_TYPE_NAME,
+		api.SQLPOINTER(unsafe.Pointer(&buf[0])),
+		api.SQLSMALLINT(len(buf)*2),
+		&strLen,
+		nil)
+	if IsError(ret) {
+		return ""
+	}
+	// strLen is in bytes; each uint16 is 2 bytes.
+	n := int(strLen) / 2
+	if n > len(buf) {
+		n = len(buf)
+	}
+	return strings.ToUpper(api.UTF16ToString(buf[:n]))
+}
+
 func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 	namebuf := make([]uint16, 150)
 	namelen, sqltype, size, ret := describeColumn(h, idx, namebuf)
@@ -70,17 +96,49 @@ func NewColumn(h api.SQLHSTMT, idx int) (Column, error) {
 		SQLType: sqltype,
 	}
 	switch sqltype {
-	case api.SQL_BIT:
+	case api.SQL_BIT, api.SQL_INFX_BOOLEAN:
+		// Informix BOOLEAN (vendor type 41) → same handling as SQL_BIT.
 		return NewBindableColumn(b, api.SQL_C_BIT, 1), nil
 	case api.SQL_TINYINT, api.SQL_SMALLINT, api.SQL_INTEGER:
 		return NewBindableColumn(b, api.SQL_C_LONG, 4), nil
-	case api.SQL_BIGINT:
+	case api.SQL_BIGINT, api.SQL_INFX_BIGINT:
+		// Informix INT8/SERIAL8 (vendor type -114) → same as SQL_BIGINT.
 		return NewBindableColumn(b, api.SQL_C_SBIGINT, 8), nil
 	case api.SQL_NUMERIC, api.SQL_DECIMAL, api.SQL_FLOAT, api.SQL_REAL, api.SQL_DOUBLE:
 		return NewBindableColumn(b, api.SQL_C_DOUBLE, 8), nil
 	case api.SQL_TYPE_TIMESTAMP:
 		var v api.SQL_TIMESTAMP_STRUCT
 		return NewBindableColumn(b, api.SQL_C_TYPE_TIMESTAMP, int(unsafe.Sizeof(v))), nil
+	case api.SQL_INFX_UDT_FIXED:
+		// Informix vendor type -100 can be DATETIME, INTERVAL, or opaque.
+		// Use SQL_DESC_TYPE_NAME to disambiguate.
+		typeName := getColumnTypeName(h, idx)
+		switch {
+		case strings.HasPrefix(typeName, "DATETIME"):
+			var v api.SQL_TIMESTAMP_STRUCT
+			return NewBindableColumn(b, api.SQL_C_TYPE_TIMESTAMP, int(unsafe.Sizeof(v))), nil
+		default:
+			// Other fixed UDTs → read as string via SQL_C_CHAR.
+			if size == 0 {
+				size = 256 // reasonable default for opaque types
+			}
+			return NewVariableWidthColumn(b, api.SQL_C_CHAR, size)
+		}
+	case api.SQL_INFX_UDT_VARYING:
+		// Informix INTERVAL types → read as string.
+		if size == 0 {
+			size = 64
+		}
+		return NewVariableWidthColumn(b, api.SQL_C_CHAR, size)
+	case api.SQL_INFX_UDT_BLOB:
+		// Informix BLOB → binary large object, streamed via SQLGetData.
+		return NewVariableWidthColumn(b, api.SQL_C_BINARY, 0)
+	case api.SQL_INFX_UDT_CLOB:
+		// Informix CLOB → character large object, streamed via SQLGetData.
+		return NewVariableWidthColumn(b, api.SQL_C_CHAR, 0)
+	case api.SQL_INFX_LVARCHAR:
+		// Informix LVARCHAR → variable-length character, no fixed max.
+		return NewVariableWidthColumn(b, api.SQL_C_CHAR, 0)
 	case api.SQL_TYPE_DATE:
 		var v api.SQL_DATE_STRUCT
 		return NewBindableColumn(b, api.SQL_C_DATE, int(unsafe.Sizeof(v))), nil
@@ -254,7 +312,15 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 		return nil, nil
 	}
 	if !c.IsVariableWidth && int(c.Len) != c.Size {
-		return nil, fmt.Errorf("wrong column #%d length %d returned, %d expected", idx, c.Len, c.Size)
+		// Some vendor ODBC drivers (notably Informix CSDK) return a
+		// different byte count than the expected fixed-column size.
+		// If the returned length fits within the buffer, proceed
+		// with the actual length rather than panicking.
+		if int(c.Len) > len(c.Buffer) {
+			return nil, fmt.Errorf("column #%d: returned length %d exceeds buffer size %d", idx, c.Len, len(c.Buffer))
+		}
+		// Clamp to actual returned length.
+		return c.BaseColumn.Value(c.Buffer[:c.Len])
 	}
 	return c.BaseColumn.Value(c.Buffer[:c.Len])
 }

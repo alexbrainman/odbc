@@ -19,6 +19,8 @@ type Conn struct {
 	tx               *Tx
 	bad              bool
 	isMSAccessDriver bool
+	isInformixDriver bool
+	dbmsName         string // populated at connect time via SQLGetInfo
 }
 
 var accessDriverSubstr = strings.ToUpper(strings.Replace("DRIVER={Microsoft Access Driver", " ", "", -1))
@@ -45,7 +47,17 @@ func (d *Driver) Open(dsn string) (driver.Conn, error) {
 		return nil, NewError("SQLDriverConnect", h)
 	}
 	isAccess := strings.Contains(strings.ToUpper(strings.Replace(dsn, " ", "", -1)), accessDriverSubstr)
-	return &Conn{h: h, isMSAccessDriver: isAccess}, nil
+
+	// Detect DBMS name via SQLGetInfo for driver-specific handling.
+	dbmsName := getDBMSName(h)
+	isInformix := strings.Contains(strings.ToUpper(dbmsName), "INFORMIX")
+
+	return &Conn{
+		h:                h,
+		isMSAccessDriver: isAccess,
+		isInformixDriver: isInformix,
+		dbmsName:         dbmsName,
+	}, nil
 }
 
 func (c *Conn) Close() (err error) {
@@ -73,6 +85,92 @@ func (c *Conn) newError(apiName string, handle interface{}) error {
 		c.bad = true
 	}
 	return err
+}
+
+// getDBMSName retrieves the DBMS product name via SQLGetInfo.
+// Returns empty string on failure (non-fatal).
+func getDBMSName(h api.SQLHDBC) string {
+	buf := make([]uint16, 128)
+	var outLen api.SQLSMALLINT
+	ret := api.SQLGetInfo(h, api.SQL_DBMS_NAME,
+		api.SQLPOINTER(unsafe.Pointer(&buf[0])),
+		api.SQLSMALLINT(len(buf)*2),
+		&outLen)
+	if IsError(ret) {
+		return ""
+	}
+	n := int(outLen) / 2
+	if n > len(buf) {
+		n = len(buf)
+	}
+	return api.UTF16ToString(buf[:n])
+}
+
+// Ping implements driver.Pinger.
+// For Informix, uses SQL_ATTR_CONNECTION_DEAD which is cheaper than
+// a round-trip query. Falls back to a lightweight query for other drivers.
+func (c *Conn) Ping(ctx context.Context) error {
+	if c.bad {
+		return driver.ErrBadConn
+	}
+
+	// Check context first.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Try SQL_ATTR_CONNECTION_DEAD (supported by most modern drivers).
+	var dead int32
+	var outLen api.SQLINTEGER
+	ret := api.SQLGetConnectAttr(c.h, api.SQL_ATTR_CONNECTION_DEAD,
+		api.SQLPOINTER(unsafe.Pointer(&dead)),
+		4, &outLen)
+	if !IsError(ret) {
+		if dead == api.SQL_CD_TRUE {
+			c.bad = true
+			return driver.ErrBadConn
+		}
+		return nil
+	}
+
+	// Fallback: execute a no-op query.
+	_, err := c.QueryContext(ctx, "SELECT 1", nil)
+	if err != nil {
+		c.bad = true
+		return driver.ErrBadConn
+	}
+	return nil
+}
+
+// IsValid implements driver.Validator.
+// Called by sql.DB's pool to check if a connection can be reused.
+func (c *Conn) IsValid() bool {
+	if c.bad {
+		return false
+	}
+	var dead int32
+	var outLen api.SQLINTEGER
+	ret := api.SQLGetConnectAttr(c.h, api.SQL_ATTR_CONNECTION_DEAD,
+		api.SQLPOINTER(unsafe.Pointer(&dead)),
+		4, &outLen)
+	if IsError(ret) {
+		// If we can't check, assume it's still valid.
+		return true
+	}
+	return dead != api.SQL_CD_TRUE
+}
+
+// ResetSession implements driver.SessionResetter.
+// Called by sql.DB when a connection is returned to the pool.
+func (c *Conn) ResetSession(ctx context.Context) error {
+	if c.bad {
+		return driver.ErrBadConn
+	}
+	// If there's an orphaned transaction, roll it back.
+	if c.tx != nil {
+		c.tx.Rollback()
+	}
+	return nil
 }
 
 // QueryContext implements the driver.QueryerContext interface.
