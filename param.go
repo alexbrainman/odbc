@@ -32,6 +32,9 @@ func (p *Parameter) StoreStrLen_or_IndPtr(v api.SQLLEN) *api.SQLLEN {
 
 }
 
+// exposeable hook for binding; tests override this to capture arguments.
+var sqlBindParameter = api.SQLBindParameter
+
 func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Conn) error {
 	// TODO(brainman): Reuse memory for previously bound values. If memory
 	// is reused, we, probably, do not need to call SQLBindParameter either.
@@ -70,6 +73,9 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 				sqltype = api.SQL_WLONGVARCHAR
 			case p.isDescribed:
 				sqltype = p.SQLType
+				if p.Size != 0 {
+					size = p.Size
+				}
 			case size <= 1:
 				sqltype = api.SQL_WVARCHAR
 			default:
@@ -163,7 +169,7 @@ func (p *Parameter) BindValue(h api.SQLHSTMT, idx int, v driver.Value, conn *Con
 	default:
 		return fmt.Errorf("unsupported type %T", v)
 	}
-	ret := api.SQLBindParameter(h, api.SQLUSMALLINT(idx+1),
+	ret := sqlBindParameter(h, api.SQLUSMALLINT(idx+1),
 		api.SQL_PARAM_INPUT, ctype, sqltype, size, decimal,
 		api.SQLPOINTER(buf), buflen, plen)
 	if IsError(ret) {
