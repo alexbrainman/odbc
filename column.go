@@ -256,7 +256,15 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 	if !c.IsVariableWidth && int(c.Len) != c.Size {
 		return nil, fmt.Errorf("wrong column #%d length %d returned, %d expected", idx, c.Len, c.Size)
 	}
-	return c.BaseColumn.Value(c.Buffer[:c.Len])
+	// Guard against drivers (seen with DB2 on CHAR columns with UTF-8
+	// DSN encoding) that return a negative SQL_LEN or one larger than
+	// the bound buffer. The old code sliced c.Buffer[:c.Len] directly
+	// and panicked with 'slice bounds out of range [:-4]'.
+	n := int(c.Len)
+	if n < 0 || n > len(c.Buffer) {
+		return nil, fmt.Errorf("column #%d returned length %d out of range for buffer size %d", idx, c.Len, len(c.Buffer))
+	}
+	return c.BaseColumn.Value(c.Buffer[:n])
 }
 
 // NonBindableColumn provide access to columns, that can't be bound.
