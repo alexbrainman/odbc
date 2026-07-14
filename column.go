@@ -154,10 +154,15 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 		s := (*[1 << 28]uint16)(p)[: len(buf)/2 : len(buf)/2]
 		return utf16toutf8(s), nil
 	case api.SQL_C_TYPE_TIMESTAMP:
+		// SQL DATE/TIME/TIMESTAMP are zone-less wall clocks. Build the time.Time in
+		// time.UTC (not time.Local, as upstream does): UTC is a fixed zero offset with
+		// no DST, so the raw stored components are carried verbatim — time.Local would
+		// NORMALIZE a wall clock landing in a spring-forward gap of the process TZ,
+		// silently shifting the value, and make results depend on the host's TZ.
 		t := (*api.SQL_TIMESTAMP_STRUCT)(p)
 		r := time.Date(int(t.Year), time.Month(t.Month), int(t.Day),
 			int(t.Hour), int(t.Minute), int(t.Second), int(t.Fraction),
-			time.Local)
+			time.UTC)
 		return r, nil
 	case api.SQL_C_GUID:
 		t := (*api.SQLGUID)(p)
@@ -174,19 +179,19 @@ func (c *BaseColumn) Value(buf []byte) (driver.Value, error) {
 	case api.SQL_C_DATE:
 		t := (*api.SQL_DATE_STRUCT)(p)
 		r := time.Date(int(t.Year), time.Month(t.Month), int(t.Day),
-			0, 0, 0, 0, time.Local)
+			0, 0, 0, 0, time.UTC)
 		return r, nil
 	case api.SQL_C_TIME:
 		t := (*api.SQL_TIME_STRUCT)(p)
 		r := time.Date(1, time.January, 1,
-			int(t.Hour), int(t.Minute), int(t.Second), 0, time.Local)
+			int(t.Hour), int(t.Minute), int(t.Second), 0, time.UTC)
 		return r, nil
 	case api.SQL_C_BINARY:
 		if c.SQLType == api.SQL_SS_TIME2 {
 			t := (*api.SQL_SS_TIME2_STRUCT)(p)
 			r := time.Date(1, time.January, 1,
 				int(t.Hour), int(t.Minute), int(t.Second), int(t.Fraction),
-				time.Local)
+				time.UTC)
 			return r, nil
 		}
 		return buf, nil
