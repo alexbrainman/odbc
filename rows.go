@@ -33,6 +33,14 @@ func (r *Rows) Next(dest []driver.Value) error {
 	}
 	for i := range dest {
 		v, err := r.os.Cols[i].Value(r.os.h, i)
+		if err == errBoundTruncated {
+			// SQLGetData can only read columns after the last bound
+			// one, so unbind this column and the rest, and read again.
+			if err = r.os.unbindFrom(i); err != nil {
+				return err
+			}
+			v, err = r.os.Cols[i].Value(r.os.h, i)
+		}
 		if err != nil {
 			return err
 		}

@@ -242,6 +242,33 @@ func (c *BindableColumn) Bind(h api.SQLHSTMT, idx int) (bool, error) {
 	return true, nil
 }
 
+// Unbind releases column binding made by Bind.
+func (c *BindableColumn) Unbind(h api.SQLHSTMT, idx int) error {
+	ret := api.SQLBindCol(h, api.SQLUSMALLINT(idx+1), c.CType, nil, 0, nil)
+	if IsError(ret) {
+		return NewError("SQLBindCol", h)
+	}
+	c.IsBound = false
+	return nil
+}
+
+// errBoundTruncated is returned by BindableColumn.Value when odbc driver
+// could not fit column data into bound buffer. Caller is expected to
+// unbind the column (and all columns after it) and call Value again.
+var errBoundTruncated = errors.New("odbc: bound column value truncated")
+
+// nullTerminatorSize returns size of null-termination character that
+// odbc driver appends to data of ctype.
+func nullTerminatorSize(ctype api.SQLSMALLINT) int {
+	switch ctype {
+	case api.SQL_C_WCHAR:
+		return 2
+	case api.SQL_C_CHAR:
+		return 1
+	}
+	return 0
+}
+
 func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 	if !c.IsBound {
 		ret := c.Len.GetData(h, idx, c.CType, c.Buffer)
@@ -252,6 +279,17 @@ func (c *BindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
 	if c.Len.IsNull() {
 		// is NULL
 		return nil, nil
+	}
+	if n := len(c.Buffer) - nullTerminatorSize(c.CType); c.IsVariableWidth && (c.Len < 0 || int(c.Len) > n) {
+		// Driver truncated the data (for example, when it converts
+		// character set). Len is either SQL_NO_TOTAL or the full
+		// length of the data.
+		if c.IsBound {
+			return nil, errBoundTruncated
+		}
+		// Keep what we have received, and read the rest in chunks.
+		total := append([]byte(nil), c.Buffer[:n]...)
+		return c.BaseColumn.getDataChunked(h, idx, total)
 	}
 	if !c.IsVariableWidth && int(c.Len) != c.Size {
 		return nil, fmt.Errorf("wrong column #%d length %d returned, %d expected", idx, c.Len, c.Size)
@@ -271,8 +309,14 @@ func (c *NonBindableColumn) Bind(h api.SQLHSTMT, idx int) (bool, error) {
 }
 
 func (c *NonBindableColumn) Value(h api.SQLHSTMT, idx int) (driver.Value, error) {
+	return c.BaseColumn.getDataChunked(h, idx, nil)
+}
+
+// getDataChunked reads column data with SQLGetData in chunks, until
+// all data is received. Data received already, if any, is passed in
+// total, and the rest is appended to it.
+func (c *BaseColumn) getDataChunked(h api.SQLHSTMT, idx int, total []byte) (driver.Value, error) {
 	var l BufferLen
-	var total []byte
 	b := make([]byte, 1024)
 loop:
 	for {
@@ -324,5 +368,5 @@ loop:
 			return nil, NewError("SQLGetData", h)
 		}
 	}
-	return c.BaseColumn.Value(total)
+	return c.Value(total)
 }
