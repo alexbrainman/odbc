@@ -159,6 +159,21 @@ func (s *ODBCStmt) BindColumns() error {
 	return nil
 }
 
+// unbindFrom unbinds all bound columns starting from column idx.
+// Values of the current row stay available through SQLGetData.
+func (s *ODBCStmt) unbindFrom(idx int) error {
+	for i := idx; i < len(s.Cols); i++ {
+		c, ok := s.Cols[i].(*BindableColumn)
+		if !ok || !c.IsBound {
+			continue
+		}
+		if err := c.Unbind(s.h, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *ODBCStmt) Cancel() error {
 	ret := api.SQLCancel(s.h)
 	if IsError(ret) {
